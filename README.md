@@ -1,24 +1,46 @@
-# 📈 Stock Market Analyzer Bot
-A Python-based stock analysis and prediction tool that combines SMA strategy and XGBoost regression to forecast trends, generate trade signals, and evaluate strategy performance.
+# Stock Market Analyzer
 
-# 🔍 Features
-📊 SMA Crossover Strategy (customizable short & long windows)
+A local stock research and paper-trading lab. It uses Yahoo Finance for market data, technical features, return-based predictions, and a simulated portfolio. It never sends brokerage orders.
 
-🧠 XGBoost Regression for short-term trend prediction
+## Setup
 
-🔁 Backtesting Module with dynamic result visualization
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
 
-📈 Matplotlib-based Graphs for price movement, buy/sell signals, and prediction overlay
+## Run Streamlit app (recommended)
 
-⚙️ Modular code structure for easy strategy experimentation
+```powershell
+$env:PYTHONPATH = "src"
+streamlit run streamlit_app.py
+```
 
-# 🧰 Tech Stack
-Python, pandas, NumPy, matplotlib, XGBoost, yfinance
+## Optional FastAPI run
 
-# 📦 Example Output
-Buy/Sell markers on candlestick charts
+```powershell
+$env:PYTHONPATH = "src"
+uvicorn stockmarket.api:app --reload
+```
 
-Accuracy metrics for XGBoost predictions
+## CLI sanity check
 
-Profit/loss summary from backtesting
+```powershell
+python StockMarketAnalyzer.py
+```
 
+## Test
+
+```powershell
+$env:PYTHONPATH = "src"
+pytest -q
+```
+
+## GitHub and Hosting
+
+- CI pipeline: `.github/workflows/ci.yml`
+- Streamlit runtime config: `.streamlit/config.toml`
+- Deployment instructions: `DEPLOYMENT.md`
+
+This is a research/demo tool. Historical model metrics do not guarantee future performance, and market data may be delayed or incomplete.

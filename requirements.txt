@@ -1,0 +1,12 @@
+numpy
+pandas
+yfinance
+ta
+plotly
+fastapi
+uvicorn
+streamlit
+jinja2
+python-multipart
+pytest
+httpx

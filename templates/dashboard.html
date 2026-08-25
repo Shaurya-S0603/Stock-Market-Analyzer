@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paper Market Lab</title>
+  <style>
+    :root { color-scheme: dark; font-family: Georgia, serif; background: #101416; color: #e8eee8; }
+    body { max-width: 960px; margin: 0 auto; padding: 32px 20px; }
+    h1 { font-size: 42px; margin: 0 0 8px; color: #c7f36b; }
+    .subtle { color: #9ba89d; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 28px 0; }
+    .panel { border: 1px solid #334239; background: #18201c; padding: 18px; border-radius: 6px; }
+    .value { font-size: 28px; margin-top: 8px; }
+    form { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+    label { display: grid; gap: 5px; color: #9ba89d; }
+    input, select, button { padding: 10px; border: 1px solid #536255; border-radius: 4px; background: #101416; color: #e8eee8; }
+    button { background: #c7f36b; color: #101416; font-weight: bold; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; } th, td { text-align: left; padding: 9px; border-bottom: 1px solid #334239; }
+    .error { color: #ff9c85; }
+  </style>
+</head>
+<body>
+  <p class="subtle">LOCAL PAPER ACCOUNT / NO LIVE ORDERS</p>
+  <h1>{{ symbol }} Market Lab</h1>
+  <p class="subtle">Use real market data for research, simulated fills for practice.</p>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <section class="grid">
+    <div class="panel"><div class="subtle">Latest price</div><div class="value">{% if price %}${{ '%.2f'|format(price) }}{% else %}Unavailable{% endif %}</div></div>
+    <div class="panel"><div class="subtle">Cash</div><div class="value">${{ '%.2f'|format(portfolio.cash) }}</div></div>
+    <div class="panel"><div class="subtle">Equity</div><div class="value">${{ '%.2f'|format(portfolio.equity) }}</div></div>
+    <div class="panel"><div class="subtle">Paper P&L</div><div class="value">${{ '%.2f'|format(portfolio.pnl) }}</div></div>
+  </section>
+  <section class="panel">
+    <h2>Simulated order</h2>
+    <form method="post" action="/orders">
+      <label>Symbol<input name="symbol" value="{{ symbol }}" required></label>
+      <label>Side<select name="side"><option>buy</option><option>sell</option></select></label>
+      <label>Quantity<input name="quantity" type="number" min="1" value="1" required></label>
+      <label>Fill price<input name="price" type="number" min="0.01" step="0.01" value="{{ price or 0 }}" required></label>
+      <button type="submit">Place paper order</button>
+    </form>
+  </section>
+  <section class="panel" style="margin-top:12px">
+    <h2>Recent orders</h2>
+    <table><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th>Fee</th></tr>
+    {% for order in orders %}<tr><td>{{ order.symbol }}</td><td>{{ order.side }}</td><td>{{ order.quantity }}</td><td>${{ '%.2f'|format(order.price) }}</td><td>${{ '%.2f'|format(order.fee) }}</td></tr>{% else %}<tr><td colspan="5" class="subtle">No paper orders yet.</td></tr>{% endfor %}</table>
+  </section>
+</body>
+</html>
