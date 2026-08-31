@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .analysis import AnalysisRequest, AnalysisService, SymbolAnalysis
+from .analysis import AnalysisRequest, AnalysisService, SymbolAnalysis, WatchlistAnalysis
 
 
 @dataclass(frozen=True)
@@ -43,9 +43,10 @@ class PortfolioCycleService:
         symbols: list[str],
         request: AnalysisRequest,
         allocations: dict[str, float] | None = None,
+        watchlist: WatchlistAnalysis | None = None,
     ) -> PortfolioResearchCycle:
         allocation_map = {symbol.upper(): float(weight) for symbol, weight in (allocations or {}).items()}
-        watchlist = self.analysis_service.analyze_watchlist(symbols, request)
+        watchlist = watchlist or self.analysis_service.analyze_watchlist(symbols, request)
         states: dict[str, PortfolioSignalState] = {}
         for symbol in symbols:
             analysis = watchlist.available.get(symbol)
