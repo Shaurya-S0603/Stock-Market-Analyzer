@@ -9,6 +9,7 @@ from .paper_strategy import PaperOnlyPortfolioStrategy, PaperStrategyCycleResult
 from .portfolio import PortfolioService, RiskPolicy
 from .portfolio_cycle import PortfolioCycleService, PortfolioResearchCycle, PortfolioSignalState
 from .risk import RiskAssessment, RiskEngine, RiskLimits
+from .symbol_stats import SymbolStrategyStats, build_symbol_strategy_stats
 
 __all__ = [
     "TraderAnalytics",
@@ -23,6 +24,8 @@ __all__ = [
     "PortfolioAttribution",
     "SymbolAttribution",
     "build_portfolio_attribution",
+    "SymbolStrategyStats",
+    "build_symbol_strategy_stats",
     "AnalysisRequest",
     "AnalysisService",
     "OpportunityRanker",
