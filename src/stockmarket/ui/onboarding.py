@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import os
 
 import streamlit as st
 
 from ..services import AITraderConfig, RiskLimits, TraderMode
+from ..storage import Store
 from .components import callout, kpi_grid, page_header, section_header
 from .sidebar import load_settings, parse_watchlist, save_settings
 from .trader import save_trader_config
@@ -67,17 +69,14 @@ def validate_allocations(allocations: dict[str, float], cash_reserve_pct: float)
     return True, total, "Portfolio allocation is valid."
 
 
-def onboarding_complete() -> bool:
-    return bool(st.session_state.get("portfolio_onboarding_complete", False))
-
-
-def current_portfolio_setup() -> dict:
-    setup = st.session_state.get("portfolio_setup", {})
-    return setup if isinstance(setup, dict) else {}
+def _profile_store() -> Store:
+    if "store" not in st.session_state:
+        st.session_state.store = Store(os.getenv("PAPER_DB_PATH", ".data/paper_trading.db"))
+    return st.session_state.store
 
 
 def _risk_config(profile: str, mode: TraderMode, largest_allocation: float) -> AITraderConfig:
-    values = RISK_PROFILES[profile]
+    values = RISK_PROFILES.get(profile, RISK_PROFILES["Balanced"])
     return AITraderConfig(
         mode=mode,
         min_confidence=float(values["min_confidence"]),
@@ -91,6 +90,69 @@ def _risk_config(profile: str, mode: TraderMode, largest_allocation: float) -> A
             volatility_target_pct=float(values["volatility_target_pct"]),
         ),
     )
+
+
+def _restore_persisted_profile() -> bool:
+    profile = _profile_store().portfolio_profile()
+    if not profile or not profile.get("allocations"):
+        return False
+    allocations = {str(symbol): float(weight) for symbol, weight in profile["allocations"].items()}
+    symbols = list(allocations)
+    settings = load_settings()
+    save_settings(replace(settings, watchlist=symbols, starting_cash=float(profile["starting_capital"])))
+    try:
+        mode = TraderMode(str(profile["trader_mode"]))
+    except ValueError:
+        mode = TraderMode.OBSERVE
+    risk_profile = str(profile.get("risk_profile", "Balanced"))
+    save_trader_config(_risk_config(risk_profile, mode, max(allocations.values(), default=5.0)))
+    st.session_state.portfolio_setup = {
+        "starting_cash": float(profile["starting_capital"]),
+        "symbols": symbols,
+        "allocations": allocations,
+        "cash_reserve_pct": float(profile["cash_target_pct"]),
+        "risk_profile": risk_profile,
+        "trader_mode": mode.value,
+    }
+    st.session_state.portfolio_onboarding_complete = True
+    return True
+
+
+def onboarding_complete() -> bool:
+    if bool(st.session_state.get("portfolio_onboarding_complete", False)):
+        return True
+    return _restore_persisted_profile()
+
+
+def current_portfolio_setup() -> dict:
+    setup = st.session_state.get("portfolio_setup", {})
+    if isinstance(setup, dict) and setup:
+        return setup
+    if _restore_persisted_profile():
+        return st.session_state.get("portfolio_setup", {})
+    return {}
+
+
+def persist_portfolio_setup(setup: dict) -> None:
+    _profile_store().save_portfolio_profile(
+        starting_capital=float(setup["starting_cash"]),
+        cash_target_pct=float(setup["cash_reserve_pct"]),
+        risk_profile=str(setup["risk_profile"]),
+        trader_mode=str(setup["trader_mode"]),
+        allocations={str(symbol): float(weight) for symbol, weight in setup["allocations"].items()},
+    )
+
+
+def clear_portfolio_setup() -> None:
+    _profile_store().clear_portfolio_profile()
+    for key in (
+        "portfolio_setup",
+        "portfolio_onboarding_complete",
+        "portfolio",
+        "portfolio_config",
+        "ai_trader_auto_fingerprint",
+    ):
+        st.session_state.pop(key, None)
 
 
 def render_onboarding() -> None:
@@ -122,8 +184,9 @@ def render_onboarding() -> None:
         value=", ".join(settings.watchlist or ["MSFT", "AAPL", "GOOGL", "NVDA", "AMZN"]),
         help="Comma-separated Yahoo Finance symbols. No security is added automatically as an investment recommendation.",
     )
-    symbols = parse_watchlist(raw_symbols)[:20]
-    if len(parse_watchlist(raw_symbols)) > 20:
+    parsed_symbols = parse_watchlist(raw_symbols)
+    symbols = parsed_symbols[:20]
+    if len(parsed_symbols) > 20:
         st.warning("The first 20 unique symbols will be used.")
 
     section_header("3 · Allocation", "Set capital ceilings while preserving an explicit cash reserve")
@@ -203,6 +266,7 @@ def render_onboarding() -> None:
         "trader_mode": mode.value,
     }
     st.session_state.portfolio_setup = setup
+    persist_portfolio_setup(setup)
     save_settings(replace(settings, watchlist=symbols, starting_cash=float(starting_cash)))
     save_trader_config(_risk_config(risk_profile, mode, largest))
     st.session_state.portfolio_onboarding_complete = True
