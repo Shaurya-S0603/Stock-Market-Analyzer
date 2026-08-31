@@ -45,17 +45,65 @@ class TradeDecision:
     executed: bool = False
 
 
+def cycle_fingerprint(analyses: dict[str, SymbolAnalysis], config: AITraderConfig) -> tuple:
+    """Stable signature used to avoid re-evaluating the same market bars in active-session automation."""
+    config.validate()
+    market = tuple(
+        sorted(
+            (
+                symbol.upper(),
+                str(analysis.timestamp),
+                analysis.signal.action,
+                round(float(analysis.predicted_return), 10),
+            )
+            for symbol, analysis in analyses.items()
+        )
+    )
+    limits = config.risk_limits
+    settings = (
+        config.mode.value,
+        round(config.min_confidence, 6),
+        round(config.allocation_pct, 6),
+        round(limits.max_position_pct, 6),
+        round(limits.max_portfolio_exposure_pct, 6),
+        limits.max_open_positions,
+        limits.max_daily_trades,
+        round(limits.max_daily_loss_pct, 6),
+        round(limits.volatility_target_pct, 6),
+    )
+    return market + (settings,)
+
+
 class AITraderService:
     """Evaluates model signals and optionally routes approved actions to the paper portfolio only."""
 
-    def evaluate_symbol(self, analysis: SymbolAnalysis, model_gate_passed: bool, portfolio: PaperPortfolio, config: AITraderConfig, prices: dict[str, float] | None = None, orders: list[dict] | None = None) -> TradeDecision:
+    def evaluate_symbol(
+        self,
+        analysis: SymbolAnalysis,
+        model_gate_passed: bool,
+        portfolio: PaperPortfolio,
+        config: AITraderConfig,
+        prices: dict[str, float] | None = None,
+        orders: list[dict] | None = None,
+    ) -> TradeDecision:
         config.validate()
         symbol = analysis.symbol.upper()
         signal = analysis.signal.action
         confidence = float(analysis.signal.confidence)
         position = portfolio.positions.get(symbol)
         position_qty = position.quantity if position else 0
-        base = dict(symbol=symbol, signal=signal, price=float(analysis.price), confidence=confidence, predicted_return=float(analysis.predicted_return), net_edge=float(analysis.signal.net_edge), model_gate_passed=bool(model_gate_passed), executed=False)
+
+        base = dict(
+            symbol=symbol,
+            signal=signal,
+            price=float(analysis.price),
+            confidence=confidence,
+            predicted_return=float(analysis.predicted_return),
+            net_edge=float(analysis.signal.net_edge),
+            model_gate_passed=bool(model_gate_passed),
+            executed=False,
+        )
+
         if config.mode == TraderMode.OFF:
             return TradeDecision(decision="OFF", quantity=0, reason="AI Trader is disabled.", **base)
         if signal == "Hold":
@@ -64,22 +112,35 @@ class AITraderService:
             return TradeDecision(decision="REJECT", quantity=0, reason="Model evidence gate did not pass for this symbol.", **base)
         if confidence < config.min_confidence:
             return TradeDecision(decision="REJECT", quantity=0, reason=f"Signal confidence {confidence:.0%} is below the {config.min_confidence:.0%} minimum.", **base)
+
         if signal == "Buy":
             if position_qty > 0:
                 return TradeDecision(decision="REJECT", quantity=0, reason="An open paper position already exists for this symbol.", **base)
             latest = analysis.live_features.iloc[-1] if hasattr(analysis, "live_features") else None
             volatility = float(latest.get("volatility_10", 0.01)) if latest is not None else 0.01
-            assessment = RiskEngine().assess_entry(symbol, float(analysis.price), confidence, volatility, portfolio, prices or {symbol: float(analysis.price)}, orders or [], config.allocation_pct, config.risk_limits)
+            assessment = RiskEngine().assess_entry(
+                symbol, float(analysis.price), confidence, volatility, portfolio,
+                prices or {symbol: float(analysis.price)}, orders or [], config.allocation_pct, config.risk_limits,
+            )
             if not assessment.approved:
                 return TradeDecision(decision="REJECT", quantity=0, reason=assessment.reason, **base)
             return TradeDecision(decision="BUY", quantity=assessment.quantity, reason=f"Signal and model gates passed. {assessment.reason}", **base)
+
         if signal == "Sell":
             if position_qty <= 0:
                 return TradeDecision(decision="REJECT", quantity=0, reason="Sell signal ignored because no long paper position is open.", **base)
             return TradeDecision(decision="SELL", quantity=position_qty, reason="Exit signal, confidence, and model evidence gates passed.", **base)
+
         return TradeDecision(decision="HOLD", quantity=0, reason="Unsupported signal was treated as hold.", **base)
 
-    def run_cycle(self, analyses: dict[str, SymbolAnalysis], model_gates: dict[str, bool], portfolio: PaperPortfolio, portfolio_service: PortfolioService, config: AITraderConfig) -> list[TradeDecision]:
+    def run_cycle(
+        self,
+        analyses: dict[str, SymbolAnalysis],
+        model_gates: dict[str, bool],
+        portfolio: PaperPortfolio,
+        portfolio_service: PortfolioService,
+        config: AITraderConfig,
+    ) -> list[TradeDecision]:
         config.validate()
         decisions: list[TradeDecision] = []
         prices = {symbol: float(analysis.price) for symbol, analysis in analyses.items()}
@@ -87,7 +148,8 @@ class AITraderService:
         for symbol, analysis in analyses.items():
             decision = self.evaluate_symbol(analysis, model_gates.get(symbol, False), portfolio, config, prices, orders)
             if config.mode == TraderMode.PAPER_AUTO and decision.decision in {"BUY", "SELL"} and decision.quantity > 0:
-                portfolio_service.execute(symbol, decision.decision.lower(), decision.quantity, decision.price, reason="ai_trader")
+                side = decision.decision.lower()
+                portfolio_service.execute(symbol, side, decision.quantity, decision.price, reason="ai_trader")
                 decision = TradeDecision(**{**decision.__dict__, "executed": True, "reason": decision.reason + " Paper order executed."})
             decisions.append(decision)
         return decisions

@@ -54,6 +54,7 @@ def dashboard_page(ctx: AppContext) -> None:
         {"label":"AI win rate","value":f"{trader.win_rate:.1%}","delta":f"{trader.closed_trades} closed AI trades","tone":"positive" if trader.win_rate >= .5 and trader.closed_trades else "blue","icon":"◎"},
         {"label":"AI Trader","value":trader_config.mode.value.replace("_", " "),"delta":f"{trader.executed_decisions} automated fills logged","tone":"positive" if trader_config.mode == TraderMode.PAPER_AUTO else "blue","icon":"AI"},
     ])
+
     section_header("Portfolio performance", "Snapshot history is recorded on AI Trader cycles")
     left, right = st.columns([1.7, 1])
     with left:
@@ -68,8 +69,15 @@ def dashboard_page(ctx: AppContext) -> None:
             h[0].metric("Execution rate", f"{trader.execution_rate:.1%}")
             h[1].metric("Model gate pass", f"{trader.model_gate_pass_rate:.1%}")
             st.caption(f"Latest reference: {primary_symbol} · {primary.signal.action} · {primary.signal.confidence:.0%} confidence")
+
     section_header("Market signal board", f"{ctx.settings.interval} bars · {ctx.settings.horizon}-bar forecast horizon")
-    st.dataframe(signal_table(result.available), width="stretch", hide_index=True, column_config={"price": st.column_config.NumberColumn("Price", format="$%.2f"), "predicted_return_pct": st.column_config.NumberColumn("Predicted return", format="%.3f%%"), "net_edge_pct": st.column_config.NumberColumn("Net edge", format="%.3f%%"), "confidence": st.column_config.ProgressColumn("Confidence", min_value=0.0, max_value=1.0, format="%.0f%%")})
+    st.dataframe(signal_table(result.available), width="stretch", hide_index=True, column_config={
+        "price": st.column_config.NumberColumn("Price", format="$%.2f"),
+        "predicted_return_pct": st.column_config.NumberColumn("Predicted return", format="%.3f%%"),
+        "net_edge_pct": st.column_config.NumberColumn("Net edge", format="%.3f%%"),
+        "confidence": st.column_config.ProgressColumn("Confidence", min_value=0.0, max_value=1.0, format="%.0f%%"),
+    })
+
     section_header("Recent AI decisions", "Accepted and rejected decisions remain visible for audit")
     recent = _decision_frame_from_store(ctx, 8)
     if recent.empty:
@@ -106,6 +114,7 @@ def ai_trader_page(ctx: AppContext) -> None:
         {"label":"Realized AI P&L","value":f"${analytics.realized_pnl:,.2f}","delta":f"Expectancy ${analytics.expectancy:,.2f}","tone":"positive" if analytics.realized_pnl >= 0 else "negative","icon":"$"},
         {"label":"Profit factor","value":f"{analytics.profit_factor:.2f}","delta":f"{analytics.executed_decisions} executed decisions","tone":"positive" if analytics.profit_factor >= 1 else "warning","icon":"↗"},
     ])
+
     section_header("Trader controls", "OBSERVE records decisions without fills; PAPER AUTO uses simulated cash only")
     with st.form("ai_trader_config_form"):
         core = st.columns(3)
@@ -125,27 +134,33 @@ def ai_trader_page(ctx: AppContext) -> None:
             volatility_target_pct = r2[2].slider("Volatility target (%)", 0.2, 5.0, limits.volatility_target_pct, 0.1)
         saved = st.form_submit_button("Save AI Trader configuration", type="primary", use_container_width=True)
     if saved:
-        save_trader_config(AITraderConfig(TraderMode(mode), float(min_confidence), float(allocation_pct), RiskLimits(float(max_position_pct), float(max_exposure_pct), int(max_positions), int(max_daily_trades), float(max_daily_loss_pct), float(volatility_target_pct))))
+        save_trader_config(AITraderConfig(
+            TraderMode(mode), float(min_confidence), float(allocation_pct),
+            RiskLimits(float(max_position_pct), float(max_exposure_pct), int(max_positions), int(max_daily_trades), float(max_daily_loss_pct), float(volatility_target_pct)),
+        ))
         st.success("AI Trader configuration saved.")
         st.rerun()
+
     action = st.columns([1, 3])
     run_now = action[0].button("Run decision cycle", type="primary", use_container_width=True, disabled=config.mode == TraderMode.OFF)
-    action[1].caption("Each cycle refreshes model signals, checks benchmark evidence and risk limits, then observes or places simulated fills according to mode.")
+    action[1].caption("Manual cycles run immediately. In PAPER AUTO, the app also checks every two minutes while this Streamlit session remains open and evaluates only when a new market-bar fingerprint appears.")
     if run_now:
         decisions = run_trader_cycle(ctx, config)
         executed = sum(1 for decision in decisions if decision.executed)
         st.success(f"Cycle evaluated {len(decisions)} symbols and executed {executed} paper fills.") if config.mode == TraderMode.PAPER_AUTO else st.info(f"Observed {len(decisions)} decisions with no paper fills.")
+
     section_header("Latest decision cycle")
     frame = decisions_frame()
     if frame.empty:
         st.info("No session decision cycle yet. OBSERVE mode is the safest way to inspect behavior before enabling automated paper fills.")
     else:
         st.dataframe(frame, width="stretch", hide_index=True, column_config={"Price":st.column_config.NumberColumn(format="$%.2f"),"Confidence":st.column_config.ProgressColumn(min_value=0.0,max_value=1.0,format="%.0f%%")})
+
     history = ctx.store.ai_decisions(limit=250)
     section_header("Decision distribution", "Persistent audit history")
     with st.container(border=True):
         render_decision_mix(history)
-    callout("Execution boundary", "PAPER AUTO can only submit simulated fills into PaperPortfolio. The application contains no brokerage authentication, funding, or real-order endpoint.")
+    callout("Execution boundary", "PAPER AUTO can only submit simulated fills into PaperPortfolio. Automatic checks run only while this Streamlit session is open, are deduplicated by market-bar fingerprint, and have no brokerage authentication, funding, or real-order endpoint.")
 
 
 def portfolio_page(ctx: AppContext) -> None:
