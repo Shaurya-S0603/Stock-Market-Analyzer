@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from ..services import AITraderConfig, AITraderService, RiskLimits, RiskPolicy, TraderMode
+from ..services import AITraderConfig, AITraderService, JournalService, RiskLimits, RiskPolicy, TraderMode
 from .context import AppContext
 
 
@@ -36,7 +36,9 @@ def run_trader_cycle(ctx: AppContext, config: AITraderConfig) -> list:
         except ValueError:
             gates[symbol] = False
     decisions = AITraderService().run_cycle(result.available, gates, ctx.portfolio, ctx.portfolio_service, config)
+    cycle = JournalService(ctx.store).record_cycle(decisions, config.mode, ctx.portfolio, prices)
     st.session_state.ai_trader_last_decisions = [decision.__dict__ for decision in decisions]
+    st.session_state.ai_trader_last_cycle = cycle.__dict__
     return decisions
 
 
