@@ -6,6 +6,7 @@ from enum import StrEnum
 from ..trading import PaperPortfolio
 from .analysis import SymbolAnalysis
 from .portfolio import PortfolioService
+from .risk import RiskEngine, RiskLimits
 
 
 class TraderMode(StrEnum):
@@ -19,12 +20,14 @@ class AITraderConfig:
     mode: TraderMode = TraderMode.OFF
     min_confidence: float = 0.65
     allocation_pct: float = 5.0
+    risk_limits: RiskLimits = RiskLimits()
 
     def validate(self) -> None:
         if not 0.0 <= self.min_confidence <= 1.0:
             raise ValueError("min_confidence must be between 0 and 1")
         if not 0.1 <= self.allocation_pct <= 100.0:
             raise ValueError("allocation_pct must be between 0.1 and 100")
+        self.risk_limits.validate()
 
 
 @dataclass(frozen=True)
@@ -45,7 +48,7 @@ class TradeDecision:
 class AITraderService:
     """Evaluates model signals and optionally routes approved actions to the paper portfolio only."""
 
-    def evaluate_symbol(self, analysis: SymbolAnalysis, model_gate_passed: bool, portfolio: PaperPortfolio, config: AITraderConfig) -> TradeDecision:
+    def evaluate_symbol(self, analysis: SymbolAnalysis, model_gate_passed: bool, portfolio: PaperPortfolio, config: AITraderConfig, prices: dict[str, float] | None = None, orders: list[dict] | None = None) -> TradeDecision:
         config.validate()
         symbol = analysis.symbol.upper()
         signal = analysis.signal.action
@@ -64,12 +67,12 @@ class AITraderService:
         if signal == "Buy":
             if position_qty > 0:
                 return TradeDecision(decision="REJECT", quantity=0, reason="An open paper position already exists for this symbol.", **base)
-            budget = portfolio.cash * (config.allocation_pct / 100.0)
-            estimated_unit_cost = analysis.price * (1.0 + portfolio.slippage_rate) * (1.0 + portfolio.commission_rate)
-            quantity = int(budget / estimated_unit_cost) if estimated_unit_cost > 0 else 0
-            if quantity < 1:
-                return TradeDecision(decision="REJECT", quantity=0, reason="Available paper cash is insufficient for the configured allocation.", **base)
-            return TradeDecision(decision="BUY", quantity=quantity, reason="Signal, confidence, and model evidence gates passed.", **base)
+            latest = analysis.live_features.iloc[-1] if hasattr(analysis, "live_features") else None
+            volatility = float(latest.get("volatility_10", 0.01)) if latest is not None else 0.01
+            assessment = RiskEngine().assess_entry(symbol, float(analysis.price), confidence, volatility, portfolio, prices or {symbol: float(analysis.price)}, orders or [], config.allocation_pct, config.risk_limits)
+            if not assessment.approved:
+                return TradeDecision(decision="REJECT", quantity=0, reason=assessment.reason, **base)
+            return TradeDecision(decision="BUY", quantity=assessment.quantity, reason=f"Signal and model gates passed. {assessment.reason}", **base)
         if signal == "Sell":
             if position_qty <= 0:
                 return TradeDecision(decision="REJECT", quantity=0, reason="Sell signal ignored because no long paper position is open.", **base)
@@ -79,8 +82,10 @@ class AITraderService:
     def run_cycle(self, analyses: dict[str, SymbolAnalysis], model_gates: dict[str, bool], portfolio: PaperPortfolio, portfolio_service: PortfolioService, config: AITraderConfig) -> list[TradeDecision]:
         config.validate()
         decisions: list[TradeDecision] = []
+        prices = {symbol: float(analysis.price) for symbol, analysis in analyses.items()}
+        orders = portfolio_service.store.orders()
         for symbol, analysis in analyses.items():
-            decision = self.evaluate_symbol(analysis, model_gates.get(symbol, False), portfolio, config)
+            decision = self.evaluate_symbol(analysis, model_gates.get(symbol, False), portfolio, config, prices, orders)
             if config.mode == TraderMode.PAPER_AUTO and decision.decision in {"BUY", "SELL"} and decision.quantity > 0:
                 portfolio_service.execute(symbol, decision.decision.lower(), decision.quantity, decision.price, reason="ai_trader")
                 decision = TradeDecision(**{**decision.__dict__, "executed": True, "reason": decision.reason + " Paper order executed."})
