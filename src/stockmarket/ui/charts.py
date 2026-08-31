@@ -85,6 +85,30 @@ def render_portfolio_allocation(portfolio, prices: dict[str, float]) -> None:
     st.plotly_chart(figure, width="stretch", config={"displayModeBar": False})
 
 
+def render_target_vs_actual_allocation(rows: list) -> None:
+    if not rows:
+        st.info("No target allocation profile is available.")
+        return
+    normalized = [row.__dict__ if hasattr(row, "__dict__") else row for row in rows]
+    frame = pd.DataFrame(normalized)
+    figure = go.Figure()
+    figure.add_trace(go.Bar(x=frame["symbol"], y=frame["target_pct"], name="Target ceiling", marker_color=BLUE))
+    figure.add_trace(go.Bar(x=frame["symbol"], y=frame["actual_pct"], name="Actual weight", marker_color=CYAN))
+    _layout(figure, 390)
+    figure.update_layout(
+        title={"text": "Target vs actual allocation", "x": 0.01},
+        barmode="group",
+        yaxis_title="Portfolio weight (%)",
+        hovermode="x",
+    )
+    st.plotly_chart(figure, width="stretch", config={"displayModeBar": False, "responsive": True})
+    largest = frame.iloc[frame["drift_pct"].abs().argmax()]
+    st.caption(
+        f"Allocation summary: largest absolute drift is {largest['symbol']} at {largest['drift_pct']:+.1f} percentage points. "
+        "Target values are strategy ceilings, not forced rebalance instructions."
+    )
+
+
 def render_decision_mix(decisions: list[dict]) -> None:
     if not decisions:
         st.info("No AI decision history yet.")

@@ -3,14 +3,14 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from ..services import AITraderConfig, RiskLimits, RiskPolicy, TraderMode, build_trader_analytics
-from .charts import render_decision_mix, render_portfolio_allocation, render_portfolio_history, render_price_chart
+from ..services import AITraderConfig, RiskLimits, RiskPolicy, TraderMode, build_allocation_snapshot, build_trader_analytics
+from .charts import render_decision_mix, render_portfolio_allocation, render_portfolio_history, render_price_chart, render_target_vs_actual_allocation
 from .components import callout, kpi_grid, page_header, section_header
 from .context import AppContext
 from .pages import render_backtest, render_model_health, render_trading
 from .sidebar import render_settings_form, save_settings
 from .tables import orders_table, positions_table, signal_table
-from .trader import decisions_frame, load_trader_config, run_trader_cycle, save_trader_config
+from .trader import decisions_frame, load_trader_config, ranked_opportunities_frame, run_trader_cycle, save_trader_config
 
 
 def _analysis(ctx: AppContext):
@@ -37,6 +37,32 @@ def _decision_frame_from_store(ctx: AppContext, limit: int = 100) -> pd.DataFram
     frame["confidence"] = frame["confidence"].astype(float)
     frame["created_at"] = pd.to_datetime(frame["created_at"], errors="coerce")
     return frame
+
+
+def _allocation_rows(ctx: AppContext, prices: dict[str, float]):
+    profile = ctx.store.portfolio_profile()
+    if not profile:
+        return []
+    return build_allocation_snapshot(
+        ctx.portfolio,
+        prices,
+        profile.get("allocations", {}),
+        float(profile.get("cash_target_pct", 0.0)),
+    )
+
+
+def _allocation_frame(rows) -> pd.DataFrame:
+    if not rows:
+        return pd.DataFrame()
+    frame = pd.DataFrame([row.__dict__ if hasattr(row, "__dict__") else row for row in rows])
+    return frame.rename(columns={
+        "symbol": "Symbol",
+        "target_pct": "Target %",
+        "actual_pct": "Actual %",
+        "drift_pct": "Drift pp",
+        "market_value": "Market value",
+        "remaining_capacity": "Remaining capacity",
+    })
 
 
 def dashboard_page(ctx: AppContext) -> None:
@@ -69,6 +95,29 @@ def dashboard_page(ctx: AppContext) -> None:
             h[0].metric("Execution rate", f"{trader.execution_rate:.1%}")
             h[1].metric("Model gate pass", f"{trader.model_gate_pass_rate:.1%}")
             st.caption(f"Latest reference: {primary_symbol} · {primary.signal.action} · {primary.signal.confidence:.0%} confidence")
+
+    allocation_rows = _allocation_rows(ctx, prices)
+    section_header("Allocation discipline", "Configured portfolio sleeves versus current simulated exposure")
+    alloc_left, alloc_right = st.columns([1.55, 1])
+    with alloc_left:
+        with st.container(border=True):
+            render_target_vs_actual_allocation(allocation_rows)
+    with alloc_right:
+        frame = _allocation_frame(allocation_rows)
+        if frame.empty:
+            st.info("No persisted allocation profile.")
+        else:
+            st.dataframe(
+                frame[["Symbol", "Target %", "Actual %", "Drift pp", "Remaining capacity"]],
+                width="stretch",
+                hide_index=True,
+                column_config={
+                    "Target %": st.column_config.NumberColumn(format="%.1f%%"),
+                    "Actual %": st.column_config.NumberColumn(format="%.1f%%"),
+                    "Drift pp": st.column_config.NumberColumn(format="%+.1f"),
+                    "Remaining capacity": st.column_config.NumberColumn(format="$%.2f"),
+                },
+            )
 
     section_header("Market signal board", f"{ctx.settings.interval} bars · {ctx.settings.horizon}-bar forecast horizon")
     st.dataframe(signal_table(result.available), width="stretch", hide_index=True, column_config={
@@ -149,6 +198,23 @@ def ai_trader_page(ctx: AppContext) -> None:
         executed = sum(1 for decision in decisions if decision.executed)
         st.success(f"Cycle evaluated {len(decisions)} symbols and executed {executed} paper fills.") if config.mode == TraderMode.PAPER_AUTO else st.info(f"Observed {len(decisions)} decisions with no paper fills.")
 
+    section_header("Opportunity ranking", "Eligible BUY candidates are ordered by edge, confidence, and forecast quality before simulated sizing")
+    ranking = ranked_opportunities_frame()
+    if ranking.empty:
+        st.info("Run a decision cycle to generate the current portfolio opportunity ranking.")
+    else:
+        st.dataframe(
+            ranking,
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "Confidence": st.column_config.ProgressColumn(min_value=0.0, max_value=1.0, format="%.0f%%"),
+                "Predicted Return": st.column_config.NumberColumn(format="%+.4f"),
+                "Net Edge": st.column_config.NumberColumn(format="%+.4f"),
+                "Target Weight": st.column_config.NumberColumn(format="%.1f%%"),
+            },
+        )
+
     section_header("Latest decision cycle")
     frame = decisions_frame()
     if frame.empty:
@@ -175,14 +241,34 @@ def portfolio_page(ctx: AppContext) -> None:
         {"label":"Total P&L","value":f"${summary['pnl']:,.2f}","delta":"Since portfolio initialization","tone":"positive" if summary['pnl'] >= 0 else "negative","icon":"↗"},
         {"label":"Open positions","value":str(len(positions)),"delta":"Long-only paper inventory","tone":"blue","icon":"◫"},
     ])
-    a, b = st.columns([1, 1.65])
+    allocation_rows = _allocation_rows(ctx, prices)
+    section_header("Allocation control", "Target sleeves are ceilings; actual weights move with strategy decisions and market prices")
+    a, b = st.columns([1.3, 1])
     with a:
         with st.container(border=True):
-            render_portfolio_allocation(ctx.portfolio, prices)
+            render_target_vs_actual_allocation(allocation_rows)
     with b:
-        section_header("Open positions")
-        if positions.empty: st.info("No open paper positions.")
-        else: st.dataframe(positions, width="stretch", hide_index=True)
+        with st.container(border=True):
+            render_portfolio_allocation(ctx.portfolio, prices)
+    allocation_frame = _allocation_frame(allocation_rows)
+    if not allocation_frame.empty:
+        st.dataframe(
+            allocation_frame[["Symbol", "Target %", "Actual %", "Drift pp", "Market value", "Remaining capacity"]],
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "Target %": st.column_config.NumberColumn(format="%.1f%%"),
+                "Actual %": st.column_config.NumberColumn(format="%.1f%%"),
+                "Drift pp": st.column_config.NumberColumn(format="%+.1f"),
+                "Market value": st.column_config.NumberColumn(format="$%.2f"),
+                "Remaining capacity": st.column_config.NumberColumn(format="$%.2f"),
+            },
+        )
+    section_header("Open positions")
+    if positions.empty:
+        st.info("No open paper positions.")
+    else:
+        st.dataframe(positions, width="stretch", hide_index=True)
     with st.expander("Manual paper execution", expanded=False):
         render_trading(result.available, ctx.portfolio, ctx.portfolio_service, ctx.store, prices)
 

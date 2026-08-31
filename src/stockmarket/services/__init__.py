@@ -1,4 +1,5 @@
 from .ai_trader import AITraderConfig, AITraderService, TradeDecision, TraderMode, cycle_fingerprint
+from .allocation import AllocationSnapshotRow, build_allocation_snapshot
 from .analytics import TraderAnalytics, build_trader_analytics
 from .analysis import AnalysisRequest, AnalysisService, SymbolAnalysis, WatchlistAnalysis
 from .journal import JournalService, TraderCycleSummary
@@ -16,6 +17,8 @@ __all__ = [
     "AITraderService",
     "TradeDecision",
     "TraderMode",
+    "AllocationSnapshotRow",
+    "build_allocation_snapshot",
     "AnalysisRequest",
     "AnalysisService",
     "OpportunityRanker",
