@@ -2,6 +2,7 @@ from .ai_trader import AITraderConfig, AITraderService, TradeDecision, TraderMod
 from .analytics import TraderAnalytics, build_trader_analytics
 from .analysis import AnalysisRequest, AnalysisService, SymbolAnalysis, WatchlistAnalysis
 from .journal import JournalService, TraderCycleSummary
+from .opportunity import OpportunityRanker, RankedOpportunity
 from .portfolio import PortfolioService, RiskPolicy
 from .portfolio_cycle import PortfolioCycleService, PortfolioResearchCycle, PortfolioSignalState
 from .risk import RiskAssessment, RiskEngine, RiskLimits
@@ -16,6 +17,8 @@ __all__ = [
     "TraderMode",
     "AnalysisRequest",
     "AnalysisService",
+    "OpportunityRanker",
+    "RankedOpportunity",
     "PortfolioCycleService",
     "PortfolioResearchCycle",
     "PortfolioSignalState",
