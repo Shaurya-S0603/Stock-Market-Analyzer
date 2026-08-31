@@ -8,6 +8,7 @@ from .opportunity import OpportunityRanker, RankedOpportunity
 from .paper_strategy import PaperOnlyPortfolioStrategy, PaperStrategyCycleResult
 from .portfolio import PortfolioService, RiskPolicy
 from .portfolio_cycle import PortfolioCycleService, PortfolioResearchCycle, PortfolioSignalState
+from .rebalancing import PaperRebalancePlan, RebalanceInstruction, build_rebalance_plan
 from .risk import RiskAssessment, RiskEngine, RiskLimits
 from .symbol_stats import SymbolStrategyStats, build_symbol_strategy_stats
 
@@ -26,6 +27,9 @@ __all__ = [
     "build_portfolio_attribution",
     "SymbolStrategyStats",
     "build_symbol_strategy_stats",
+    "PaperRebalancePlan",
+    "RebalanceInstruction",
+    "build_rebalance_plan",
     "AnalysisRequest",
     "AnalysisService",
     "OpportunityRanker",
