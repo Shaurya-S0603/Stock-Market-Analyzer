@@ -6,6 +6,7 @@ from typing import Protocol
 import pandas as pd
 
 from ..backtest import run_backtest
+from ..benchmarks import ModelGate, assess_model_gate, benchmark_models
 from ..features import build_features
 from ..modeling import ModelResult, train_model
 from ..signals import Signal, make_signal
@@ -13,29 +14,47 @@ from ..validation import walk_forward_scores
 
 
 class MarketProvider(Protocol):
-    def fetch(self,symbol:str,period:str,interval:str,minimum_rows:int=80)->pd.DataFrame: ...
+    def fetch(self, symbol: str, period: str, interval: str, minimum_rows: int = 80) -> pd.DataFrame: ...
 
 
 @dataclass(frozen=True)
 class AnalysisRequest:
-    period:str; interval:str; horizon:int; buy_threshold:float; sell_threshold:float; commission_rate:float; slippage_rate:float
+    period: str
+    interval: str
+    horizon: int
+    buy_threshold: float
+    sell_threshold: float
+    commission_rate: float
+    slippage_rate: float
+
     @property
-    def round_trip_cost(self)->float: return 2.0*(self.commission_rate+self.slippage_rate)
+    def round_trip_cost(self) -> float:
+        return 2.0 * (self.commission_rate + self.slippage_rate)
 
 
 @dataclass
 class SymbolAnalysis:
-    symbol:str; bars:pd.DataFrame; training_features:pd.DataFrame; live_features:pd.DataFrame; model:ModelResult; price:float; timestamp:object; predicted_return:float; signal:Signal; horizon:int
+    symbol: str
+    bars: pd.DataFrame
+    training_features: pd.DataFrame
+    live_features: pd.DataFrame
+    model: ModelResult
+    price: float
+    timestamp: object
+    predicted_return: float
+    signal: Signal
+    horizon: int
 
 
 @dataclass
 class WatchlistAnalysis:
-    available:dict[str,SymbolAnalysis]; unavailable:dict[str,str]
+    available: dict[str, SymbolAnalysis]
+    unavailable: dict[str, str]
 
 
 class AnalysisService:
-    def __init__(self,provider:MarketProvider): self.provider=provider
-    def analyze_symbol(self,symbol:str,request:AnalysisRequest)->SymbolAnalysis:
+    def __init__(self, provider: MarketProvider): self.provider = provider
+    def analyze_symbol(self, symbol: str, request: AnalysisRequest) -> SymbolAnalysis:
         bars=self.provider.fetch(symbol,request.period,request.interval)
         training_features=build_features(bars,horizon=request.horizon,include_target=True); live_features=build_features(bars,horizon=request.horizon,include_target=False)
         model=train_model(training_features); predicted_return=float(model.predict(live_features.iloc[[-1]])[0])
@@ -49,6 +68,8 @@ class AnalysisService:
         return WatchlistAnalysis(available,unavailable)
     def validation_scores(self,analysis:SymbolAnalysis,splits:int=3)->list[dict[str,float]]:
         return walk_forward_scores(analysis.training_features,splits=splits,purge=analysis.horizon)
+    def benchmark_report(self,analysis:SymbolAnalysis,splits:int=3)->tuple[list[dict[str,float|str]],ModelGate]:
+        rows=benchmark_models(analysis.training_features,splits=splits,purge=analysis.horizon); return rows,assess_model_gate(rows)
     def backtest(self,analysis:SymbolAnalysis,request:AnalysisRequest,starting_cash:float,test_fraction:float=0.2)->dict:
         features=analysis.training_features; split=max(int(len(features)*(1.0-test_fraction)),1); test_features=features.iloc[split:]
         if len(test_features)<2: raise ValueError("Not enough holdout rows for a backtest")
