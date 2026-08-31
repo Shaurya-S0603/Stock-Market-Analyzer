@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["main", "engineering-upgrade", "ui-ai-trader-v2"]
+    branches: ["main", "engineering-upgrade", "ui-ai-trader-v2", "hotfix-streamlit-navigation"]
   pull_request:
 
 jobs:
@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13"]
+        python-version: ["3.12", "3.13", "3.14"]
 
     steps:
       - name: Checkout

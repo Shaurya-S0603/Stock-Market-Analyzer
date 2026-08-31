@@ -37,29 +37,85 @@ def _paper_auto_heartbeat(ctx) -> None:
         st.caption("PAPER AUTO active · waiting for a new market bar.")
 
 
+def _build_navigation_pages(ctx):
+    """Build pages with stable, explicit URL paths.
+
+    Streamlit infers a callable page's URL from the callable name when
+    ``url_path`` is omitted. Because these page callbacks close over ``ctx``
+    through lambdas, every callable is named ``<lambda>``. Explicit paths keep
+    those callbacks while guaranteeing unique routes on all supported
+    Streamlit versions.
+    """
+    return {
+        "Workspace": [
+            st.Page(
+                lambda: dashboard_page(ctx),
+                title="Dashboard",
+                icon=":material/dashboard:",
+                default=True,
+            ),
+            st.Page(
+                lambda: markets_page(ctx),
+                title="Markets",
+                icon=":material/candlestick_chart:",
+                url_path="markets",
+            ),
+            st.Page(
+                lambda: ai_trader_page(ctx),
+                title="AI Trader",
+                icon=":material/smart_toy:",
+                url_path="ai-trader",
+            ),
+            st.Page(
+                lambda: portfolio_page(ctx),
+                title="Portfolio",
+                icon=":material/account_balance_wallet:",
+                url_path="portfolio",
+            ),
+            st.Page(
+                lambda: trade_journal_page(ctx),
+                title="Trade Journal",
+                icon=":material/receipt_long:",
+                url_path="trade-journal",
+            ),
+        ],
+        "Research": [
+            st.Page(
+                lambda: model_analytics_page(ctx),
+                title="Model Analytics",
+                icon=":material/model_training:",
+                url_path="model-analytics",
+            ),
+            st.Page(
+                lambda: backtesting_page(ctx),
+                title="Backtesting",
+                icon=":material/query_stats:",
+                url_path="backtesting",
+            ),
+            st.Page(
+                lambda: risk_analytics_page(ctx),
+                title="Risk Analytics",
+                icon=":material/security:",
+                url_path="risk-analytics",
+            ),
+        ],
+        "System": [
+            st.Page(
+                lambda: settings_page(ctx),
+                title="Settings",
+                icon=":material/settings:",
+                url_path="settings",
+            ),
+        ],
+    }
+
+
 def render_app() -> None:
     apply_theme()
     settings = load_settings()
     ctx = build_context(settings)
 
-    pages = {
-        "Workspace": [
-            st.Page(lambda: dashboard_page(ctx), title="Dashboard", icon=":material/dashboard:", default=True),
-            st.Page(lambda: markets_page(ctx), title="Markets", icon=":material/candlestick_chart:"),
-            st.Page(lambda: ai_trader_page(ctx), title="AI Trader", icon=":material/smart_toy:"),
-            st.Page(lambda: portfolio_page(ctx), title="Portfolio", icon=":material/account_balance_wallet:"),
-            st.Page(lambda: trade_journal_page(ctx), title="Trade Journal", icon=":material/receipt_long:"),
-        ],
-        "Research": [
-            st.Page(lambda: model_analytics_page(ctx), title="Model Analytics", icon=":material/model_training:"),
-            st.Page(lambda: backtesting_page(ctx), title="Backtesting", icon=":material/query_stats:"),
-            st.Page(lambda: risk_analytics_page(ctx), title="Risk Analytics", icon=":material/security:"),
-        ],
-        "System": [
-            st.Page(lambda: settings_page(ctx), title="Settings", icon=":material/settings:"),
-        ],
-    }
-    navigation = st.navigation(pages, position="sidebar", expanded=True)
+    navigation = st.navigation(_build_navigation_pages(ctx), position="sidebar", expanded=True)
     render_sidebar_shell(settings)
     with st.sidebar:
         _paper_auto_heartbeat(ctx)
