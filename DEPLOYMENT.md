@@ -1,44 +1,29 @@
 # Deployment Guide
 
-## 1) Push to GitHub
+## GitHub workflow
 
-1. Create a new GitHub repository.
-2. From this project root, run:
+Use a feature branch and merge through a pull request. GitHub Actions compiles the project and runs regression tests on Python 3.12 and 3.13.
 
-```powershell
-git init
-git add .
-git commit -m "Initial Streamlit trading lab"
-git branch -M main
-git remote add origin https://github.com/<your-username>/<repo-name>.git
-git push -u origin main
-```
+Do not commit `.venv/`, `.data/`, SQLite files, `.env*`, caches, or Streamlit secrets.
 
-## 2) Host on Streamlit Community Cloud (recommended)
+## Streamlit Community Cloud
 
-1. Go to https://share.streamlit.io and sign in with GitHub.
-2. Click `New app`.
-3. Select your repository, branch `main`, and main file `streamlit_app.py`.
-4. Click `Deploy`.
+1. Sign in with the GitHub account that can access `Shaurya-S0603/Stock-Market-Analyzer`.
+2. Create an app from the repository.
+3. Select branch `main`.
+4. Set the entrypoint to `streamlit_app.py`.
+5. Use Python 3.12 unless another runtime has been deliberately tested by CI.
+6. Deploy.
 
-The app installs dependencies from `requirements.txt` automatically.
+Dependencies live in root `requirements.txt`; Streamlit configuration is in `.streamlit/config.toml`.
 
-## 3) Optional: Host on Render
+### Persistence
 
-1. Create a new `Web Service` from your GitHub repository.
-2. Build command:
+The `.data/` SQLite blotter is suitable for local/demo use but should be considered ephemeral on hosted Streamlit infrastructure. A production multi-user deployment should use a hosted database.
+
+## Pre-deployment checks
 
 ```bash
-pip install -r requirements.txt
+pytest -q
+python -m compileall -q StockMarketAnalyzer.py streamlit_app.py src tests
 ```
-
-3. Start command:
-
-```bash
-streamlit run streamlit_app.py --server.port $PORT --server.address 0.0.0.0
-```
-
-## 4) GitHub Actions CI
-
-A CI workflow is included at `.github/workflows/ci.yml`.
-It runs compile checks and tests on pushes and pull requests.
