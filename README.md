@@ -1,84 +1,95 @@
 # QuantEdge Stock Market Analyzer
 
-A professional Streamlit market-research and **paper-trading** workstation with a Quantedge-inspired institutional UI, leakage-aware model validation, explicit benchmarks, realistic backtesting, portfolio risk controls, and an autonomous paper-only strategy runner.
+A professional Streamlit market-research and **paper-trading** workstation with portfolio-aware capital allocation, multi-symbol signal research, leakage-aware model validation, realistic backtesting, and an autonomous paper-only strategy runner.
 
-> **Simulation and research only.** The application has no brokerage authentication, funding workflow, or real-money order endpoint. Historical metrics, signals, automated paper decisions, and backtests are not guarantees of future performance or personalized investment advice.
+> **Simulation and research only.** The application has no brokerage authentication, funding workflow, or real-money order endpoint. Historical metrics, forecasts, allocations, automated paper decisions, and backtests are not guarantees of future performance or personalized investment advice.
+
+## v0.5 Portfolio Intelligence
+
+On first launch, the app creates a paper portfolio profile before entering the workspace:
+
+1. choose simulated starting capital;
+2. select 1–20 symbols;
+3. assign equal-weight or custom per-symbol allocation ceilings;
+4. preserve an explicit cash reserve;
+5. choose a Conservative, Balanced, or Aggressive simulation profile;
+6. start in OBSERVE or PAPER AUTO mode.
+
+A symbol allocation is a **maximum capital sleeve**, not an instruction to immediately buy that percentage. A simulated entry still needs a valid signal, benchmark evidence, sufficient confidence, positive cost-adjusted edge, available cash, and risk capacity.
+
+The profile and allocations are persisted in SQLite and restored when that database remains available.
 
 ## Product surfaces
 
-The application is organized like a real analytics product rather than one long Streamlit worksheet:
-
-- **Dashboard** — portfolio KPIs, strategy health, signal board, and recent AI decisions.
-- **Markets** — watchlist signals, cost-adjusted model edge, confidence, and technical price structure.
-- **AI Trader** — OFF / OBSERVE / PAPER AUTO modes, risk-aware sizing, model gates, and autonomous simulated execution.
-- **Portfolio** — equity, cash, allocation, positions, and optional manual paper orders.
-- **Trade Journal** — persisted AI decisions, rejected opportunities, execution cycles, and paper fills.
+- **Dashboard** — portfolio KPIs, target-vs-actual allocation, sleeve capacity, market signals, strategy health, and recent AI decisions.
+- **Markets** — watchlist signals, cost-adjusted edge, confidence, and technical price structure.
+- **AI Trader** — OFF / OBSERVE / PAPER AUTO modes, opportunity ranking, model gates, risk-aware sizing, and simulated execution.
+- **Portfolio** — equity, cash, allocation, P&L attribution, positions, manual rebalance planner, and optional manual paper orders.
+- **Trade Journal** — persisted AI decisions, paper fills, decision cycles, and per-symbol strategy scorecards.
 - **Model Analytics** — purged walk-forward validation, holdout diagnostics, benchmark ladder, and model evidence gate.
-- **Backtesting** — purged holdout simulation with next-bar execution, costs, benchmark comparison, drawdown, hit rate, exposure, turnover, and risk-adjusted metrics.
-- **Risk Analytics** — exposure, position caps, daily loss/trade limits, protective exits, and risk-event logs.
-- **Settings** — watchlist, data horizon, signal thresholds, capital, costs, and protective exits.
+- **Backtesting** — leakage-aware holdout simulation with next-bar execution, costs, drawdown, exposure, turnover, and benchmark metrics.
+- **Risk Analytics** — portfolio exposure, symbol-sleeve capacity, daily limits, protective exits, and risk-event logs.
+- **Settings** — runtime/model assumptions plus one route for reconfiguring the persistent portfolio profile.
 
-## AI Trader workflow
+## Portfolio-aware AI Trader workflow
 
 ```text
-Yahoo Finance bars
+Persistent portfolio profile
       ↓
-Feature pipeline
+Configured symbols + allocation sleeves
       ↓
-Ridge + momentum forecast
+Multi-symbol market / feature / forecast cycle
       ↓
-Cost-aware Buy / Hold / Sell signal
+Purged benchmark evidence gate per symbol
       ↓
-Purged benchmark evidence gate
+Cost-aware signal + confidence filter
       ↓
-Confidence threshold
+Opportunity ranking
       ↓
-Portfolio risk engine
+Portfolio risk + symbol sleeve capacity
+      ↓
+Position sizing
       ↓
 OFF / OBSERVE / PAPER AUTO
       ↓
-PaperPortfolio simulated fill
+PaperPortfolio simulated fill only
       ↓
-Decision journal + portfolio snapshot
+Journal + portfolio snapshot
       ↓
-Trader analytics
+Allocation drift + attribution + symbol statistics
 ```
 
 ### Modes
 
-- **OFF** — calculates no autonomous trader cycle.
-- **OBSERVE** — evaluates and persists decisions without placing paper fills.
-- **PAPER AUTO** — approved decisions can place simulated fills. While the Streamlit session is open, a two-minute heartbeat checks for new market bars. The same market/configuration fingerprint is not evaluated twice.
+- **OFF** — no autonomous trader cycle.
+- **OBSERVE** — ranks and persists decisions without changing paper positions.
+- **PAPER AUTO** — eligible decisions may place simulated fills. While the Streamlit session is open, a two-minute heartbeat checks for new market/configuration/allocation fingerprints.
 
-PAPER AUTO does **not** continue after the Streamlit session is closed. There is intentionally no hidden daemon or real brokerage integration.
+PAPER AUTO stops when the Streamlit session closes. There is intentionally no hidden background daemon or brokerage integration.
+
+## Allocation and ranking
+
+Each configured symbol has a capital ceiling. If it is already at its sleeve limit, additional BUY signals are rejected. If paper cash is scarce, eligible BUY candidates are ranked by cost-adjusted net edge, confidence, and forecast return before simulated sizing. SELL exits are processed before new entries so released simulated cash can be considered in the same cycle.
 
 ## Risk controls
 
-Before an autonomous paper entry is allowed, the risk engine can enforce:
+Autonomous paper entries can enforce per-symbol allocation ceilings, global position and exposure caps, maximum simultaneous positions, daily trade and realized-loss limits, confidence/volatility-adjusted sizing, duplicate-position prevention, and optional stop-loss/take-profit exits.
 
-- maximum position allocation;
-- maximum total portfolio exposure;
-- maximum simultaneous positions;
-- maximum daily trades;
-- maximum daily realized loss;
-- confidence-adjusted and volatility-adjusted sizing;
-- duplicate-position prevention;
-- optional stop-loss and take-profit exits.
+## Allocation analytics and attribution
 
-Every AI cycle, accepted/rejected decision, paper fill, portfolio snapshot, and protective risk event is persisted to SQLite for analysis.
+Dashboard and Portfolio compare **target ceilings vs actual weights**, percentage-point drift, and remaining sleeve capacity. Portfolio attribution combines persistent realized P&L from recorded paper orders with current-session unrealized P&L from open simulated positions.
+
+Trade Journal adds per-symbol strategy statistics including decisions, model-gate pass rate, confidence, average net edge, closed strategy trades, win rate, realized P&L, and expectancy. Manual rebalance transactions are intentionally excluded from strategy-outcome statistics.
+
+## Manual paper rebalancing
+
+Rebalancing is deliberately separate from the signal-driven AI Trader. The Portfolio page can build a tolerance-based paper rebalance plan that identifies overweight sleeves first, sells simulated excess exposure before proposing buys, preserves the configured cash target where whole-share sizing allows, previews every instruction, and only executes when the user explicitly applies the simulated plan.
+
+Rebalancing does not create model signals, alter opportunity rankings, or run automatically inside PAPER AUTO.
 
 ## Model governance
 
-The forecasting stack is deliberately simple until evidence justifies complexity:
-
-- live predictions use the newest technically complete feature row;
-- holdout evaluation uses a forecast-horizon purge gap;
-- walk-forward validation uses expanding training windows and purged test folds;
-- zero-return, historical-mean, momentum, ridge, and ridge+momentum candidates are compared on identical folds;
-- autonomous entries require the current model to pass the benchmark evidence gate;
-- backtests fit only on pre-holdout history and execute on the next bar's open.
-
-Do not add a fashionable model merely because it has more letters in its name. A more complex candidate belongs here only after it beats the simple baselines on the existing leakage-safe evaluation pipeline and remains useful after trading costs.
+The forecasting stack remains deliberately simple until evidence supports more complexity: live predictions use the newest complete feature row; holdout evaluation and walk-forward folds use forecast-horizon purge gaps; zero-return, historical-mean, momentum, ridge, and ridge+momentum candidates share identical validation folds; autonomous entries require the current model to pass the benchmark gate; and backtests fit only on pre-holdout history with next-bar execution.
 
 ## Architecture
 
@@ -86,37 +97,46 @@ Do not add a fashionable model merely because it has more letters in its name. A
 streamlit_app.py
 src/stockmarket/
 ├── services/
-│   ├── analysis.py       # Market/model/backtest orchestration
-│   ├── ai_trader.py      # Autonomous paper decision engine
-│   ├── risk.py           # Portfolio-aware sizing and entry controls
-│   ├── journal.py        # AI cycle + decision persistence
-│   ├── analytics.py      # Trader KPIs / outcome analytics
-│   └── portfolio.py      # Paper fills + protective exits
+│   ├── analysis.py
+│   ├── portfolio_cycle.py
+│   ├── opportunity.py
+│   ├── paper_strategy.py
+│   ├── allocation.py
+│   ├── risk.py
+│   ├── attribution.py
+│   ├── symbol_stats.py
+│   ├── rebalancing.py
+│   ├── ai_trader.py
+│   ├── journal.py
+│   ├── analytics.py
+│   └── portfolio.py
 ├── ui/
-│   ├── app.py            # Multipage navigation + active-session heartbeat
-│   ├── site_pages.py     # Product pages
-│   ├── components.py     # KPI / section / status primitives
-│   ├── charts.py         # Plotly market, portfolio, and strategy charts
-│   ├── context.py        # Shared application context
-│   ├── sidebar.py        # Settings and application shell
-│   ├── trader.py         # Streamlit AI-trader state / cycle coordination
-│   ├── tables.py         # Presentation shaping
-│   └── theme.py          # Accessible institutional glass design system
-├── benchmarks.py         # Baselines + model evidence gate
-├── validation.py         # Purged walk-forward evaluation
-├── modeling.py           # Ridge + momentum primitives
-├── features.py           # Technical features
-├── backtest.py           # Next-bar simulation + risk metrics
-├── data.py               # Yahoo Finance + OHLCV validation
-├── signals.py            # Cost-aware signal rules
-├── trading.py            # PaperPortfolio accounting
-├── storage.py            # SQLite orders, decisions, snapshots, risk events
-└── api.py                # Optional FastAPI research interface
+│   ├── onboarding.py
+│   ├── portfolio_intelligence.py
+│   ├── app.py
+│   ├── site_pages.py
+│   ├── components.py
+│   ├── charts.py
+│   ├── context.py
+│   ├── sidebar.py
+│   ├── trader.py
+│   ├── tables.py
+│   └── theme.py
+├── benchmarks.py
+├── validation.py
+├── modeling.py
+├── features.py
+├── backtest.py
+├── data.py
+├── signals.py
+├── trading.py
+├── storage.py
+└── api.py
 ```
 
 ## Run locally
 
-Python 3.12 is recommended; Python 3.11 and 3.13 are supported.
+Python 3.12 is recommended; CI validates Python 3.12, 3.13, and 3.14.
 
 ```bash
 python -m venv .venv
@@ -134,29 +154,10 @@ pytest -q
 python -m compileall -q StockMarketAnalyzer.py streamlit_app.py src tests
 ```
 
-GitHub Actions runs the same regression/compile gate on Python 3.12 and 3.13.
+GitHub Actions runs regression, fresh-app Streamlit smoke, and compilation gates on Python 3.12, 3.13, and 3.14.
 
-## Optional FastAPI interface
+## Persistence note
 
-```bash
-uvicorn stockmarket.api:app --reload
-```
+`PAPER_DB_PATH` defaults to `.data/paper_trading.db`. SQLite stores portfolio profiles, allocations, paper orders, AI decisions, snapshots, model runs, and risk events. Streamlit Community Cloud storage should be treated as ephemeral, so a redeploy or runtime replacement may require onboarding again. Use a hosted database before treating long-running cloud history as durable.
 
-The API reuses `AnalysisService` so research behavior follows the same leakage-aware modeling rules.
-
-## Environment configuration
-
-| Variable | Default | Meaning |
-|---|---:|---|
-| `STOCK_SYMBOL` | `MSFT` | Primary API / CLI ticker |
-| `STOCK_PERIOD` | `60d` | Yahoo Finance history window |
-| `STOCK_INTERVAL` | `5m` | Bar interval |
-| `FORECAST_HORIZON` | `12` | Forecast horizon in bars |
-| `STARTING_CASH` | `100000` | Paper account starting cash |
-| `COMMISSION_RATE` | `0.001` | Per-side simulated commission |
-| `SLIPPAGE_RATE` | `0.0005` | Simulated slippage |
-| `BUY_THRESHOLD` | `0.005` | Net-edge threshold for Buy |
-| `SELL_THRESHOLD` | `-0.005` | Net-edge threshold for Sell |
-| `PAPER_DB_PATH` | `.data/paper_trading.db` | Local SQLite audit database |
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for hosting notes and persistence limitations.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for deployment details.

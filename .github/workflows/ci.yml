@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["main", "engineering-upgrade", "ui-ai-trader-v2", "hotfix-streamlit-navigation"]
+    branches: ["main", "v0.5-portfolio-intelligence"]
   pull_request:
 
 jobs:

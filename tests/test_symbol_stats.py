@@ -11,6 +11,7 @@ def test_symbol_strategy_stats_separate_ticker_performance(tmp_path) -> None:
     store.add_ai_decision("c2", TraderMode.OBSERVE.value, msft)
     store.add_order("AAPL", "sell", 2, 110, 0, realized_pnl=20, reason="ai_trader")
     store.add_order("AAPL", "sell", 1, 95, 0, realized_pnl=-5, reason="stop_loss")
+    store.add_order("AAPL", "sell", 1, 150, 0, realized_pnl=100, reason="rebalance_manual")
 
     rows = build_symbol_strategy_stats(store)
     by_symbol = {row.symbol: row for row in rows}

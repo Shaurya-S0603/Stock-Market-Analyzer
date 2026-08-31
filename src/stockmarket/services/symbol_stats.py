@@ -22,6 +22,11 @@ class SymbolStrategyStats:
     expectancy: float
 
 
+def _is_strategy_exit(order: dict) -> bool:
+    reason = str(order.get("reason", "manual"))
+    return reason.startswith("ai_") or reason in {"stop_loss", "take_profit"}
+
+
 def build_symbol_strategy_stats(store: Store) -> list[SymbolStrategyStats]:
     decisions = store.ai_decisions(limit=50_000)
     orders = store.orders()
@@ -35,19 +40,19 @@ def build_symbol_strategy_stats(store: Store) -> list[SymbolStrategyStats]:
         executed = [row for row in symbol_decisions if bool(row.get("executed"))]
         rejected = [row for row in symbol_decisions if str(row.get("decision", "")) == "REJECT"]
         gated = [row for row in symbol_decisions if bool(row.get("model_gate_passed"))]
-        automated_sells = [
+        strategy_sells = [
             row
             for row in orders
             if str(row.get("symbol", "")).upper() == symbol
             and str(row.get("side", "")).lower() == "sell"
-            and str(row.get("reason", "manual")) != "manual"
+            and _is_strategy_exit(row)
         ]
-        pnl_values = [float(row.get("realized_pnl", 0.0) or 0.0) for row in automated_sells]
+        pnl_values = [float(row.get("realized_pnl", 0.0) or 0.0) for row in strategy_sells]
         wins = [value for value in pnl_values if value > 0]
         losses = [value for value in pnl_values if value < 0]
         realized = sum(pnl_values)
         decision_count = len(symbol_decisions)
-        closed = len(automated_sells)
+        closed = len(strategy_sells)
         stats.append(
             SymbolStrategyStats(
                 symbol=symbol,
