@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stock-market-analyzer"
-version = "0.4.0"
-description = "Stock research, signal analysis, backtesting, and paper-trading lab"
-requires-python = ">=3.11,<3.14"
+version = "0.5.0"
+description = "Portfolio-aware stock research, validation, backtesting, and paper-trading intelligence lab"
+requires-python = ">=3.11,<3.15"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

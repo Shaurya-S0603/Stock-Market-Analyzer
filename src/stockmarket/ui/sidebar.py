@@ -76,7 +76,10 @@ def render_sidebar_shell(settings: UISettings) -> None:
 
 
 def render_settings_form(settings: UISettings) -> UISettings:
-    raw_watchlist = st.text_input("Watchlist symbols", value=", ".join(settings.watchlist), help="Comma-separated Yahoo Finance ticker symbols used throughout the application.")
+    st.info(
+        f"Portfolio universe: {', '.join(settings.watchlist)} · starting paper capital ${settings.starting_cash:,.0f}. "
+        "Use Portfolio Configuration below this form to change symbols, allocations, cash reserve, or starting capital."
+    )
     row = st.columns(3)
     periods = ["5d", "10d", "30d", "60d", "3mo", "6mo"]
     intervals = ["5m", "15m", "30m", "1h"]
@@ -87,14 +90,26 @@ def render_settings_form(settings: UISettings) -> UISettings:
     signal = st.columns(2)
     buy_threshold = signal[0].slider("Buy threshold (%)", 0.1, 10.0, settings.buy_threshold * 100.0, 0.1) / 100.0
     sell_threshold = -(signal[1].slider("Sell threshold (%)", 0.1, 10.0, abs(settings.sell_threshold) * 100.0, 0.1) / 100.0)
-    st.markdown("#### Paper portfolio")
-    portfolio = st.columns(3)
-    starting_cash = portfolio[0].number_input("Starting cash", min_value=1_000.0, value=float(settings.starting_cash), step=1_000.0)
-    commission_rate = portfolio[1].number_input("Commission rate", min_value=0.0, max_value=0.05, value=float(settings.commission_rate), step=0.0005, format="%.4f")
-    slippage_rate = portfolio[2].number_input("Slippage rate", min_value=0.0, max_value=0.05, value=float(settings.slippage_rate), step=0.0005, format="%.4f")
+    st.markdown("#### Transaction assumptions")
+    costs = st.columns(2)
+    commission_rate = costs[0].number_input("Commission rate", min_value=0.0, max_value=0.05, value=float(settings.commission_rate), step=0.0005, format="%.4f")
+    slippage_rate = costs[1].number_input("Slippage rate", min_value=0.0, max_value=0.05, value=float(settings.slippage_rate), step=0.0005, format="%.4f")
     st.markdown("#### Position exits")
     risk = st.columns(3)
     automation_enabled = risk[0].toggle("Enable stop / target exits", value=settings.automation_enabled)
     stop_loss_pct = risk[1].slider("Stop-loss (%)", 0.5, 20.0, settings.stop_loss_pct, 0.5)
     take_profit_pct = risk[2].slider("Take-profit (%)", 0.5, 30.0, settings.take_profit_pct, 0.5)
-    return UISettings(watchlist=parse_watchlist(raw_watchlist), period=effective_period(period, interval), interval=interval, horizon=int(horizon), buy_threshold=float(buy_threshold), sell_threshold=float(sell_threshold), starting_cash=float(starting_cash), commission_rate=float(commission_rate), slippage_rate=float(slippage_rate), automation_enabled=bool(automation_enabled), stop_loss_pct=float(stop_loss_pct), take_profit_pct=float(take_profit_pct))
+    return UISettings(
+        watchlist=list(settings.watchlist),
+        period=effective_period(period, interval),
+        interval=interval,
+        horizon=int(horizon),
+        buy_threshold=float(buy_threshold),
+        sell_threshold=float(sell_threshold),
+        starting_cash=float(settings.starting_cash),
+        commission_rate=float(commission_rate),
+        slippage_rate=float(slippage_rate),
+        automation_enabled=bool(automation_enabled),
+        stop_loss_pct=float(stop_loss_pct),
+        take_profit_pct=float(take_profit_pct),
+    )

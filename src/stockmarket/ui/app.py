@@ -4,6 +4,7 @@ import streamlit as st
 
 from ..services import TraderMode
 from .context import build_context
+from .onboarding import onboarding_complete, render_onboarding
 from .sidebar import load_settings, render_sidebar_shell
 from .site_pages import (
     ai_trader_page,
@@ -38,14 +39,7 @@ def _paper_auto_heartbeat(ctx) -> None:
 
 
 def _build_navigation_pages(ctx):
-    """Build pages with stable, explicit URL paths.
-
-    Streamlit infers a callable page's URL from the callable name when
-    ``url_path`` is omitted. Because these page callbacks close over ``ctx``
-    through lambdas, every callable is named ``<lambda>``. Explicit paths keep
-    those callbacks while guaranteeing unique routes on all supported
-    Streamlit versions.
-    """
+    """Build pages with stable, explicit URL paths."""
     return {
         "Workspace": [
             st.Page(
@@ -112,6 +106,10 @@ def _build_navigation_pages(ctx):
 
 def render_app() -> None:
     apply_theme()
+    if not onboarding_complete():
+        render_onboarding()
+        return
+
     settings = load_settings()
     ctx = build_context(settings)
 
