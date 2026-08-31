@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 import streamlit as st
 
@@ -8,17 +8,17 @@ import streamlit as st
 @dataclass(frozen=True)
 class UISettings:
     watchlist: list[str]
-    period: str
-    interval: str
-    horizon: int
-    buy_threshold: float
-    sell_threshold: float
-    starting_cash: float
-    commission_rate: float
-    slippage_rate: float
-    automation_enabled: bool
-    stop_loss_pct: float
-    take_profit_pct: float
+    period: str = "60d"
+    interval: str = "5m"
+    horizon: int = 12
+    buy_threshold: float = 0.005
+    sell_threshold: float = -0.005
+    starting_cash: float = 100_000.0
+    commission_rate: float = 0.001
+    slippage_rate: float = 0.0005
+    automation_enabled: bool = False
+    stop_loss_pct: float = 2.0
+    take_profit_pct: float = 4.0
 
 
 def sanitize_symbol(symbol: str) -> str:
@@ -45,23 +45,56 @@ def effective_period(period: str, interval: str) -> str:
     return period
 
 
-def render_sidebar() -> UISettings:
+def default_settings() -> UISettings:
+    return UISettings(watchlist=["MSFT", "AAPL", "GOOGL"])
+
+
+def load_settings() -> UISettings:
+    defaults = default_settings()
+    stored = st.session_state.get("ui_settings")
+    if not isinstance(stored, dict):
+        return defaults
+    data = asdict(defaults)
+    data.update(stored)
+    data["watchlist"] = [sanitize_symbol(symbol) for symbol in data.get("watchlist", defaults.watchlist)]
+    data["period"] = effective_period(str(data["period"]), str(data["interval"]))
+    return UISettings(**data)
+
+
+def save_settings(settings: UISettings) -> None:
+    st.session_state.ui_settings = asdict(settings)
+
+
+def render_sidebar_shell(settings: UISettings) -> None:
     with st.sidebar:
-        st.header("Controls")
-        raw_watchlist = st.text_input("Watchlist symbols", value="MSFT, AAPL, GOOGL", help="Enter comma-separated Yahoo Finance ticker symbols.")
-        period = st.selectbox("History window", ["5d", "10d", "30d", "60d", "3mo", "6mo"], index=3)
-        interval = st.selectbox("Bar interval", ["5m", "15m", "30m", "1h"], index=0)
-        horizon = st.slider("Forecast horizon (bars)", 1, 48, 12, help="Number of bars ahead represented by the target return.")
-        st.subheader("Signal settings")
-        buy_threshold = st.slider("Buy threshold (%)", 0.1, 10.0, 0.5, 0.1) / 100.0
-        sell_threshold = -(st.slider("Sell threshold (%)", 0.1, 10.0, 0.5, 0.1) / 100.0)
-        st.subheader("Paper portfolio")
-        starting_cash = st.number_input("Starting cash", min_value=1_000.0, value=100_000.0, step=1_000.0)
-        commission_rate = st.number_input("Commission rate", min_value=0.0, max_value=0.05, value=0.001, step=0.0005, format="%.4f")
-        slippage_rate = st.number_input("Slippage rate", min_value=0.0, max_value=0.05, value=0.0005, step=0.0005, format="%.4f")
-        st.subheader("Risk automation")
-        automation_enabled = st.toggle("Enable stop-loss / take-profit", value=False)
-        stop_loss_pct = st.slider("Stop-loss (%)", 0.5, 20.0, 2.0, 0.5)
-        take_profit_pct = st.slider("Take-profit (%)", 0.5, 30.0, 4.0, 0.5)
-        st.caption("Changing portfolio cash or cost assumptions resets the in-memory paper account.")
-    return UISettings(parse_watchlist(raw_watchlist), effective_period(period, interval), interval, horizon, buy_threshold, sell_threshold, float(starting_cash), float(commission_rate), float(slippage_rate), automation_enabled, float(stop_loss_pct), float(take_profit_pct))
+        st.markdown("""<div class="qe-brand"><div class="qe-brand-mark" aria-hidden="true">Q</div><div><div class="qe-brand-title">QuantEdge Lab</div><div class="qe-brand-subtitle">AI market research · paper execution</div></div></div>""", unsafe_allow_html=True)
+        st.caption("PAPER ENVIRONMENT")
+        st.markdown(f"**{len(settings.watchlist)} symbols** · {settings.interval} · {settings.period}")
+        st.caption(", ".join(settings.watchlist))
+        st.divider()
+        st.caption("No brokerage connection. All executions remain simulated.")
+
+
+def render_settings_form(settings: UISettings) -> UISettings:
+    raw_watchlist = st.text_input("Watchlist symbols", value=", ".join(settings.watchlist), help="Comma-separated Yahoo Finance ticker symbols used throughout the application.")
+    row = st.columns(3)
+    periods = ["5d", "10d", "30d", "60d", "3mo", "6mo"]
+    intervals = ["5m", "15m", "30m", "1h"]
+    period = row[0].selectbox("History window", periods, index=periods.index(settings.period if settings.period in periods else "60d"))
+    interval = row[1].selectbox("Bar interval", intervals, index=intervals.index(settings.interval))
+    horizon = row[2].slider("Forecast horizon", 1, 48, settings.horizon, help="Bars ahead represented by the prediction target.")
+    st.markdown("#### Signal thresholds")
+    signal = st.columns(2)
+    buy_threshold = signal[0].slider("Buy threshold (%)", 0.1, 10.0, settings.buy_threshold * 100.0, 0.1) / 100.0
+    sell_threshold = -(signal[1].slider("Sell threshold (%)", 0.1, 10.0, abs(settings.sell_threshold) * 100.0, 0.1) / 100.0)
+    st.markdown("#### Paper portfolio")
+    portfolio = st.columns(3)
+    starting_cash = portfolio[0].number_input("Starting cash", min_value=1_000.0, value=float(settings.starting_cash), step=1_000.0)
+    commission_rate = portfolio[1].number_input("Commission rate", min_value=0.0, max_value=0.05, value=float(settings.commission_rate), step=0.0005, format="%.4f")
+    slippage_rate = portfolio[2].number_input("Slippage rate", min_value=0.0, max_value=0.05, value=float(settings.slippage_rate), step=0.0005, format="%.4f")
+    st.markdown("#### Position exits")
+    risk = st.columns(3)
+    automation_enabled = risk[0].toggle("Enable stop / target exits", value=settings.automation_enabled)
+    stop_loss_pct = risk[1].slider("Stop-loss (%)", 0.5, 20.0, settings.stop_loss_pct, 0.5)
+    take_profit_pct = risk[2].slider("Take-profit (%)", 0.5, 30.0, settings.take_profit_pct, 0.5)
+    return UISettings(watchlist=parse_watchlist(raw_watchlist), period=effective_period(period, interval), interval=interval, horizon=int(horizon), buy_threshold=float(buy_threshold), sell_threshold=float(sell_threshold), starting_cash=float(starting_cash), commission_rate=float(commission_rate), slippage_rate=float(slippage_rate), automation_enabled=bool(automation_enabled), stop_loss_pct=float(stop_loss_pct), take_profit_pct=float(take_profit_pct))
