@@ -57,7 +57,7 @@ class PortfolioService:
                 reason = "take_profit"
             if reason:
                 fill = self.execute(symbol, "sell", position.quantity, mark, reason=reason)
-                events.append(
-                    f"Auto-exit {symbol}: {reason.replace('_', ' ')} at ${fill.price:,.2f} for {fill.quantity} shares."
-                )
+                detail = f"Auto-exit {symbol}: {reason.replace('_', ' ')} at ${fill.price:,.2f} for {fill.quantity} shares."
+                self.store.add_risk_event(reason, detail, symbol)
+                events.append(detail)
         return events
