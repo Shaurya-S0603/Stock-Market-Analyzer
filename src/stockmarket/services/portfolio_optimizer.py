@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+import pandas as pd
 
 from ..trading import PaperPortfolio
 from .ai_trader import AITraderConfig
@@ -24,6 +25,14 @@ class OptimizedOpportunity:
     reason: str
     max_correlation: float = 0.0
     correlation_adjustment: float = 1.0
+
+
+def _latest_context(analysis) -> dict:
+    """Return the latest research context when available, otherwise neutral defaults."""
+    live_features = getattr(analysis, "live_features", None)
+    if isinstance(live_features, pd.DataFrame) and not live_features.empty:
+        return live_features.iloc[-1].to_dict()
+    return {}
 
 
 class PortfolioOptimizer:
@@ -61,8 +70,12 @@ class PortfolioOptimizer:
             sleeve_capacity = max(float(state.target_weight) - current_weight, 0.0)
             if sleeve_capacity <= 0:
                 continue
-            latest = state.analysis.live_features.iloc[-1]
-            volatility_pct = max(abs(float(latest.get("context_volatility_20", latest.get("volatility_10", 0.01)))) * 100.0, 0.05)
+            latest = _latest_context(state.analysis)
+            raw_volatility = latest.get("context_volatility_20", latest.get("volatility_10", 0.01))
+            try:
+                volatility_pct = max(abs(float(raw_volatility)) * 100.0, 0.05)
+            except (TypeError, ValueError):
+                volatility_pct = 1.0
             confidence = float(item.confidence)
             edge = max(float(item.net_edge), 0.0)
             max_correlation = candidate_portfolio_correlation(item.symbol, correlation_matrix, portfolio)
