@@ -5,6 +5,7 @@ import streamlit as st
 
 from ..services import (
     AITraderConfig,
+    ExperimentRegistry,
     JournalService,
     PaperOnlyPortfolioStrategy,
     PortfolioCycleService,
@@ -58,6 +59,21 @@ def _portfolio_allocations(ctx: AppContext) -> dict[str, float]:
     return {str(symbol).upper(): float(weight) for symbol, weight in profile.get("allocations", {}).items()}
 
 
+def _register_experiments(ctx: AppContext, research_cycle) -> list[dict]:
+    registry = ExperimentRegistry(ctx.store.path)
+    records: list[dict] = []
+    for symbol, state in research_cycle.states.items():
+        benchmark: dict = {"production_gate_passed": bool(state.model_gate_passed), "production_gate_reason": state.model_gate_reason}
+        try:
+            _, best = ctx.analysis_service.ensemble_benchmark_report(state.analysis)
+            benchmark["best_challenger"] = best
+        except ValueError as exc:
+            benchmark["challenger_error"] = str(exc)
+        record = registry.record(state.analysis, ctx.request, benchmark)
+        records.append({"experiment_id": record.experiment_id, "symbol": symbol, "model_hash": record.model_hash, "regime": record.regime})
+    return records
+
+
 def run_trader_cycle(ctx: AppContext, config: AITraderConfig, result=None) -> list:
     result = result or ctx.analyze_watchlist()
     if not result.available:
@@ -74,12 +90,14 @@ def run_trader_cycle(ctx: AppContext, config: AITraderConfig, result=None) -> li
         allocations,
         watchlist=result,
     )
+    experiments = _register_experiments(ctx, research_cycle)
     strategy_result = PaperOnlyPortfolioStrategy().run(research_cycle, ctx.portfolio_service, config)
     decisions = strategy_result.decisions
     cycle = JournalService(ctx.store).record_cycle(decisions, config.mode, ctx.portfolio, prices)
     st.session_state.ai_trader_last_decisions = [decision.__dict__ for decision in decisions]
     st.session_state.ai_trader_last_ranked = [item.__dict__ for item in strategy_result.ranked_opportunities]
     st.session_state.ai_trader_last_optimized = [item.__dict__ for item in strategy_result.optimized_opportunities]
+    st.session_state.ai_trader_last_experiments = experiments
     st.session_state.ai_trader_last_cycle = cycle.__dict__
     return decisions
 
