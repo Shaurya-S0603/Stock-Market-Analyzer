@@ -85,8 +85,18 @@ class AnalysisService:
 
     def analyze_symbol(self, symbol: str, request: AnalysisRequest) -> SymbolAnalysis:
         bars = self.provider.fetch(symbol, request.period, request.interval)
-        training_features = build_features(bars, horizon=request.horizon, include_target=True)
-        live_features = build_features(bars, horizon=request.horizon, include_target=False)
+        training_features = build_features(
+            bars,
+            horizon=request.horizon,
+            include_target=True,
+            round_trip_cost=request.round_trip_cost,
+        )
+        live_features = build_features(
+            bars,
+            horizon=request.horizon,
+            include_target=False,
+            round_trip_cost=request.round_trip_cost,
+        )
         context_bars: pd.DataFrame | None = None
         current_regime = "tactical-only"
 
