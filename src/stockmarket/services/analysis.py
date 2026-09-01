@@ -5,6 +5,7 @@ from typing import Protocol
 
 import pandas as pd
 
+from ..adaptive_thresholds import compute_adaptive_thresholds
 from ..backtest import run_backtest
 from ..benchmarks import ModelGate, assess_model_gate, benchmark_models, best_benchmark, ensemble_benchmark_models
 from ..context_features import enrich_with_tactical_context
@@ -57,6 +58,9 @@ class SymbolAnalysis:
     context_bars: pd.DataFrame | None = None
     regime: str = "unknown"
     probability_profitable: float = 0.5
+    adaptive_buy_threshold: float = 0.005
+    adaptive_sell_threshold: float = -0.005
+    threshold_reason: str = "static"
 
 
 @dataclass
@@ -120,10 +124,16 @@ class AnalysisService:
         live_row = live_features.iloc[[-1]]
         predicted_return = float(model.predict(live_row)[0])
         probability_profitable = float(model.predict_probability(live_row)[0])
+        thresholds = compute_adaptive_thresholds(
+            request.buy_threshold,
+            request.sell_threshold,
+            live_row.iloc[0],
+            probability_profitable,
+        )
         signal = make_signal(
             predicted_return,
-            buy_threshold=request.buy_threshold,
-            sell_threshold=request.sell_threshold,
+            buy_threshold=thresholds.buy,
+            sell_threshold=thresholds.sell,
             round_trip_cost=request.round_trip_cost,
             calibrated_probability=probability_profitable,
         )
@@ -141,6 +151,9 @@ class AnalysisService:
             context_bars,
             current_regime,
             probability_profitable,
+            thresholds.buy,
+            thresholds.sell,
+            thresholds.reason,
         )
 
     def analyze_watchlist(self, symbols: list[str], request: AnalysisRequest) -> WatchlistAnalysis:
