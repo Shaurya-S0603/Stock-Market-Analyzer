@@ -5,6 +5,7 @@ import streamlit as st
 
 from ..services import (
     AITraderConfig,
+    ExperimentRegistry,
     JournalService,
     PaperOnlyPortfolioStrategy,
     PortfolioCycleService,
@@ -12,6 +13,7 @@ from ..services import (
     RiskPolicy,
     TraderMode,
     cycle_fingerprint,
+    detect_experiment_drift,
 )
 from .context import AppContext
 
@@ -34,6 +36,8 @@ def load_trader_config() -> AITraderConfig:
             max_daily_trades=int(risk_data.get("max_daily_trades", 12)),
             max_daily_loss_pct=float(risk_data.get("max_daily_loss_pct", 3.0)),
             volatility_target_pct=float(risk_data.get("volatility_target_pct", 1.5)),
+            max_pairwise_correlation=float(risk_data.get("max_pairwise_correlation", 0.90)),
+            correlation_penalty_floor=float(risk_data.get("correlation_penalty_floor", 0.35)),
         ),
     )
 
@@ -56,14 +60,41 @@ def _portfolio_allocations(ctx: AppContext) -> dict[str, float]:
     return {str(symbol).upper(): float(weight) for symbol, weight in profile.get("allocations", {}).items()}
 
 
+def _register_experiments(ctx: AppContext, research_cycle) -> tuple[list[dict], list[dict]]:
+    registry = ExperimentRegistry(ctx.store.path)
+    records: list[dict] = []
+    drift_rows: list[dict] = []
+    for symbol, state in research_cycle.states.items():
+        benchmark: dict = {"production_gate_passed": bool(state.model_gate_passed), "production_gate_reason": state.model_gate_reason}
+        try:
+            _, best = ctx.analysis_service.ensemble_benchmark_report(state.analysis)
+            benchmark["best_challenger"] = best
+        except ValueError as exc:
+            benchmark["challenger_error"] = str(exc)
+        record = registry.record(state.analysis, ctx.request, benchmark)
+        records.append({"experiment_id": record.experiment_id, "symbol": symbol, "model_hash": record.model_hash, "regime": record.regime})
+
+        history = registry.recent(symbol, limit=10)
+        baseline = next((row for row in history if row["experiment_id"] != record.experiment_id), None)
+        if baseline is not None:
+            current = {
+                "metrics": record.metrics,
+                "feature_stats": record.feature_stats,
+            }
+            report = detect_experiment_drift(current, baseline)
+            registry.record_drift(record.experiment_id, symbol, report)
+            drift_rows.append({"symbol": symbol, "status": report.status, "score": report.score, "reasons": report.reasons})
+    return records, drift_rows
+
+
 def run_trader_cycle(ctx: AppContext, config: AITraderConfig, result=None) -> list:
     result = result or ctx.analyze_watchlist()
     if not result.available:
         return []
     allocations = _portfolio_allocations(ctx)
     prices = {symbol: analysis.price for symbol, analysis in result.available.items()}
-    ctx.portfolio_service.apply_risk_policy(
-        prices,
+    ctx.portfolio_service.apply_adaptive_exit_policy(
+        result.available,
         RiskPolicy(ctx.settings.automation_enabled, ctx.settings.stop_loss_pct, ctx.settings.take_profit_pct),
     )
     research_cycle = PortfolioCycleService(ctx.analysis_service).run(
@@ -72,11 +103,15 @@ def run_trader_cycle(ctx: AppContext, config: AITraderConfig, result=None) -> li
         allocations,
         watchlist=result,
     )
+    experiments, drift_rows = _register_experiments(ctx, research_cycle)
     strategy_result = PaperOnlyPortfolioStrategy().run(research_cycle, ctx.portfolio_service, config)
     decisions = strategy_result.decisions
     cycle = JournalService(ctx.store).record_cycle(decisions, config.mode, ctx.portfolio, prices)
     st.session_state.ai_trader_last_decisions = [decision.__dict__ for decision in decisions]
     st.session_state.ai_trader_last_ranked = [item.__dict__ for item in strategy_result.ranked_opportunities]
+    st.session_state.ai_trader_last_optimized = [item.__dict__ for item in strategy_result.optimized_opportunities]
+    st.session_state.ai_trader_last_experiments = experiments
+    st.session_state.ai_trader_last_drift = drift_rows
     st.session_state.ai_trader_last_cycle = cycle.__dict__
     return decisions
 

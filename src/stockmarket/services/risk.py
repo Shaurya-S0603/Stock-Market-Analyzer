@@ -14,6 +14,8 @@ class RiskLimits:
     max_daily_trades: int = 12
     max_daily_loss_pct: float = 3.0
     volatility_target_pct: float = 1.5
+    max_pairwise_correlation: float = 0.90
+    correlation_penalty_floor: float = 0.35
 
     def validate(self) -> None:
         if not 0.1 <= self.max_position_pct <= 100:
@@ -26,6 +28,10 @@ class RiskLimits:
             raise ValueError("max_daily_loss_pct must be between 0.1 and 100")
         if self.volatility_target_pct <= 0:
             raise ValueError("volatility_target_pct must be positive")
+        if not 0.0 <= self.max_pairwise_correlation <= 1.0:
+            raise ValueError("max_pairwise_correlation must be between 0 and 1")
+        if not 0.0 < self.correlation_penalty_floor <= 1.0:
+            raise ValueError("correlation_penalty_floor must be between 0 and 1")
 
 
 @dataclass(frozen=True)
@@ -38,6 +44,8 @@ class RiskAssessment:
     volatility_adjustment: float
     symbol_cap_pct: float = 0.0
     symbol_capacity_remaining: float = 0.0
+    correlation_adjustment: float = 1.0
+    correlation_to_portfolio: float = 0.0
 
 
 def _today_order_stats(orders: list[dict]) -> tuple[int, float]:
@@ -72,6 +80,7 @@ class RiskEngine:
         target_allocation_pct: float,
         limits: RiskLimits,
         symbol_allocation_pct: float | None = None,
+        correlation_to_portfolio: float | None = None,
     ) -> RiskAssessment:
         limits.validate()
         symbol = symbol.upper()
@@ -92,6 +101,15 @@ class RiskEngine:
             current_symbol_value = current_position.quantity * prices.get(symbol, current_position.average_cost)
         symbol_cap_value = equity * effective_symbol_cap_pct / 100.0 if equity > 0 else 0.0
         symbol_capacity = max(symbol_cap_value - current_symbol_value, 0.0)
+        portfolio_correlation = min(max(float(correlation_to_portfolio or 0.0), 0.0), 1.0)
+        if portfolio_correlation <= 0.5:
+            correlation_adjustment = 1.0
+        else:
+            scaled = min((portfolio_correlation - 0.5) / 0.5, 1.0)
+            correlation_adjustment = max(
+                limits.correlation_penalty_floor,
+                1.0 - scaled * (1.0 - limits.correlation_penalty_floor),
+            )
 
         def reject(reason: str) -> RiskAssessment:
             return RiskAssessment(
@@ -103,6 +121,8 @@ class RiskEngine:
                 0.0,
                 effective_symbol_cap_pct,
                 symbol_capacity,
+                correlation_adjustment,
+                portfolio_correlation,
             )
 
         if symbol_allocation_pct is not None and configured_symbol_cap <= 0:
@@ -117,11 +137,21 @@ class RiskEngine:
             return reject("Portfolio exposure cap reached.")
         if symbol_capacity <= 0:
             return reject("Symbol allocation ceiling reached.")
+        if open_positions and portfolio_correlation > limits.max_pairwise_correlation:
+            return reject(
+                f"Correlation {portfolio_correlation:.2f} exceeds the {limits.max_pairwise_correlation:.2f} portfolio limit."
+            )
 
         volatility_pct = max(abs(float(recent_volatility)) * 100.0, 0.05)
         volatility_adjustment = min(1.0, max(0.25, limits.volatility_target_pct / volatility_pct))
         confidence_adjustment = min(1.0, max(0.25, float(confidence)))
-        target_budget = portfolio.cash * (target_allocation_pct / 100.0) * confidence_adjustment * volatility_adjustment
+        target_budget = (
+            portfolio.cash
+            * (target_allocation_pct / 100.0)
+            * confidence_adjustment
+            * volatility_adjustment
+            * correlation_adjustment
+        )
         exposure_room = max(equity * limits.max_portfolio_exposure_pct / 100.0 - current_exposure_value, 0.0)
         allocation_value = min(target_budget, symbol_capacity, exposure_room, portfolio.cash)
         estimated_unit_cost = price * (1.0 + portfolio.slippage_rate) * (1.0 + portfolio.commission_rate)
@@ -134,10 +164,12 @@ class RiskEngine:
         return RiskAssessment(
             True,
             quantity,
-            "Portfolio and symbol-allocation risk checks passed.",
+            "Portfolio, symbol-allocation, and correlation risk checks passed.",
             projected_exposure_pct,
             quantity * price,
             volatility_adjustment,
             effective_symbol_cap_pct,
             remaining_after_order,
+            correlation_adjustment,
+            portfolio_correlation,
         )
