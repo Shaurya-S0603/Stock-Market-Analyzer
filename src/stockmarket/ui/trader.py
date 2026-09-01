@@ -34,6 +34,8 @@ def load_trader_config() -> AITraderConfig:
             max_daily_trades=int(risk_data.get("max_daily_trades", 12)),
             max_daily_loss_pct=float(risk_data.get("max_daily_loss_pct", 3.0)),
             volatility_target_pct=float(risk_data.get("volatility_target_pct", 1.5)),
+            max_pairwise_correlation=float(risk_data.get("max_pairwise_correlation", 0.90)),
+            correlation_penalty_floor=float(risk_data.get("correlation_penalty_floor", 0.35)),
         ),
     )
 
@@ -62,8 +64,8 @@ def run_trader_cycle(ctx: AppContext, config: AITraderConfig, result=None) -> li
         return []
     allocations = _portfolio_allocations(ctx)
     prices = {symbol: analysis.price for symbol, analysis in result.available.items()}
-    ctx.portfolio_service.apply_risk_policy(
-        prices,
+    ctx.portfolio_service.apply_adaptive_exit_policy(
+        result.available,
         RiskPolicy(ctx.settings.automation_enabled, ctx.settings.stop_loss_pct, ctx.settings.take_profit_pct),
     )
     research_cycle = PortfolioCycleService(ctx.analysis_service).run(
@@ -77,6 +79,7 @@ def run_trader_cycle(ctx: AppContext, config: AITraderConfig, result=None) -> li
     cycle = JournalService(ctx.store).record_cycle(decisions, config.mode, ctx.portfolio, prices)
     st.session_state.ai_trader_last_decisions = [decision.__dict__ for decision in decisions]
     st.session_state.ai_trader_last_ranked = [item.__dict__ for item in strategy_result.ranked_opportunities]
+    st.session_state.ai_trader_last_optimized = [item.__dict__ for item in strategy_result.optimized_opportunities]
     st.session_state.ai_trader_last_cycle = cycle.__dict__
     return decisions
 
