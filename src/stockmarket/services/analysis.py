@@ -56,6 +56,7 @@ class SymbolAnalysis:
     horizon: int
     context_bars: pd.DataFrame | None = None
     regime: str = "unknown"
+    probability_profitable: float = 0.5
 
 
 @dataclass
@@ -116,12 +117,15 @@ class AnalysisService:
         live_features = enrich_with_tactical_context(live_features, bars, benchmark_bars)
 
         model = train_model(training_features, purge=request.horizon)
-        predicted_return = float(model.predict(live_features.iloc[[-1]])[0])
+        live_row = live_features.iloc[[-1]]
+        predicted_return = float(model.predict(live_row)[0])
+        probability_profitable = float(model.predict_probability(live_row)[0])
         signal = make_signal(
             predicted_return,
             buy_threshold=request.buy_threshold,
             sell_threshold=request.sell_threshold,
             round_trip_cost=request.round_trip_cost,
+            calibrated_probability=probability_profitable,
         )
         return SymbolAnalysis(
             symbol,
@@ -136,6 +140,7 @@ class AnalysisService:
             request.horizon,
             context_bars,
             current_regime,
+            probability_profitable,
         )
 
     def analyze_watchlist(self, symbols: list[str], request: AnalysisRequest) -> WatchlistAnalysis:

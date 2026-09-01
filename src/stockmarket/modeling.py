@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from .calibration import ProbabilityCalibrator, brier_score, fit_probability_calibrator
 from .features import FEATURE_COLUMNS
 
 MODEL_CONTEXT_PREFIXES = ("daily_", "context_", "regime_")
@@ -19,11 +20,18 @@ class ModelResult:
     metrics: dict[str, float]
     feature_columns: list[str]
     momentum_weight: float = 0.30
+    calibrator: ProbabilityCalibrator | None = None
 
     def predict(self, features: pd.DataFrame) -> np.ndarray:
         linear = linear_prediction(features, self)
         momentum = momentum_prediction(features[self.feature_columns])
         return (1.0 - self.momentum_weight) * linear + self.momentum_weight * momentum
+
+    def predict_probability(self, features: pd.DataFrame) -> np.ndarray:
+        scores = self.predict(features)
+        if self.calibrator is None:
+            return np.full(len(scores), 0.5, dtype=float)
+        return self.calibrator.predict(scores)
 
 
 def model_feature_columns(feature_frame: pd.DataFrame) -> list[str]:
@@ -34,8 +42,7 @@ def model_feature_columns(feature_frame: pd.DataFrame) -> list[str]:
         and column != "target_return"
         and pd.api.types.is_numeric_dtype(feature_frame[column])
     ]
-    ordered = list(FEATURE_COLUMNS) + sorted(set(extras).difference(FEATURE_COLUMNS))
-    return ordered
+    return list(FEATURE_COLUMNS) + sorted(set(extras).difference(FEATURE_COLUMNS))
 
 
 def _validate_training_frame(feature_frame: pd.DataFrame, minimum_rows: int = 20) -> list[str]:
@@ -118,6 +125,7 @@ def train_model(feature_frame: pd.DataFrame, test_fraction: float = 0.2, random_
     test_start = train_end + purge
     if train_end < 20 or len(feature_frame) - test_start < 5:
         raise ValueError("Training, purge, and test windows are too small")
+
     train_frame = feature_frame.iloc[:train_end]
     test_frame = feature_frame.iloc[test_start:]
     validation_model = fit_model(train_frame)
@@ -126,8 +134,19 @@ def train_model(feature_frame: pd.DataFrame, test_fraction: float = 0.2, random_
     metrics["baseline_rmse"] = evaluate_predictions(test_frame["target_return"], np.zeros(len(test_frame), dtype=float))["rmse"]
     metrics["holdout_rows"] = float(len(test_frame))
     metrics["purge_rows"] = float(purge)
+
+    calibrator: ProbabilityCalibrator | None = None
+    if "target_profitable_long" in test_frame.columns and len(test_frame) >= 5:
+        labels = test_frame["target_profitable_long"].to_numpy(dtype=float)
+        calibrator = fit_probability_calibrator(prediction, labels)
+        probabilities = calibrator.predict(prediction)
+        metrics["brier_score"] = brier_score(probabilities, labels)
+        metrics["calibration_base_rate"] = float(labels.mean())
+        metrics["calibration_mean_probability"] = float(probabilities.mean())
+
     final_model = fit_model(feature_frame)
     final_model.metrics = metrics
+    final_model.calibrator = calibrator
     return final_model
 
 
