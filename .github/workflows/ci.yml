@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["main", "v0.5-portfolio-intelligence"]
+    branches: ["main", "v0.7-quant-research-engine"]
   pull_request:
 
 jobs:
@@ -29,7 +29,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Compile sources
-        run: python -m compileall -q StockMarketAnalyzer.py streamlit_app.py src tests
+        run: python -m compileall -q StockMarketAnalyzer.py streamlit_app.py paper_worker.py src tests
 
       - name: Run regression tests
         run: pytest -q
