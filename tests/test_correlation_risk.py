@@ -35,6 +35,22 @@ def test_candidate_correlation_detects_near_duplicate_exposure() -> None:
     assert correlation > 0.95
 
 
+def test_correlation_matrix_skips_analyses_without_bar_history() -> None:
+    from types import SimpleNamespace
+
+    cycle = PortfolioResearchCycle(
+        states={
+            "AAA": PortfolioSignalState("AAA", SimpleNamespace(symbol="AAA"), True, "pass", 25.0),
+            "BBB": PortfolioSignalState("BBB", _analysis("BBB"), True, "pass", 25.0),
+        },
+        unavailable={},
+    )
+    matrix = build_return_correlation_matrix(cycle)
+    assert list(matrix.index) == ["BBB"]
+    assert matrix.loc["BBB", "BBB"] == 1.0
+    assert candidate_portfolio_correlation("AAA", matrix, PaperPortfolio(10_000, 0, 0)) == 0.0
+
+
 def test_risk_engine_rejects_candidate_over_correlation_limit() -> None:
     portfolio = PaperPortfolio(10_000, commission_rate=0, slippage_rate=0)
     portfolio.execute("AAA", "buy", 10, 100)
