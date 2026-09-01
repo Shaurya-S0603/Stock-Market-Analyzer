@@ -3,6 +3,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from .regime import REGIME_FEATURE_COLUMNS, add_regime_features
+
 DAILY_CONTEXT_COLUMNS = [
     "daily_return_1",
     "daily_return_5",
@@ -71,10 +73,11 @@ def align_daily_context(tactical_index: pd.DatetimeIndex, daily_context: pd.Data
 
 
 def enrich_with_daily_context(feature_frame: pd.DataFrame, daily_bars: pd.DataFrame) -> pd.DataFrame:
-    context = build_daily_context(daily_bars)
+    context = add_regime_features(build_daily_context(daily_bars))
     aligned = align_daily_context(pd.DatetimeIndex(feature_frame.index), context)
-    enriched = feature_frame.join(aligned[DAILY_CONTEXT_COLUMNS])
-    enriched = enriched.replace([np.inf, -np.inf], np.nan).dropna(subset=DAILY_CONTEXT_COLUMNS)
+    required = DAILY_CONTEXT_COLUMNS + REGIME_FEATURE_COLUMNS
+    enriched = feature_frame.join(aligned[required])
+    enriched = enriched.replace([np.inf, -np.inf], np.nan).dropna(subset=required)
     if enriched.empty:
         raise ValueError("No tactical rows remain after leakage-safe daily context alignment")
     return enriched

@@ -10,6 +10,7 @@ from ..benchmarks import ModelGate, assess_model_gate, benchmark_models
 from ..features import build_features
 from ..modeling import ModelResult, train_model
 from ..multitimeframe import enrich_with_daily_context
+from ..regime import regime_label
 from ..signals import Signal, make_signal
 from ..validation import walk_forward_scores
 
@@ -52,6 +53,7 @@ class SymbolAnalysis:
     signal: Signal
     horizon: int
     context_bars: pd.DataFrame | None = None
+    regime: str = "unknown"
 
 
 @dataclass
@@ -69,6 +71,7 @@ class AnalysisService:
         training_features = build_features(bars, horizon=request.horizon, include_target=True)
         live_features = build_features(bars, horizon=request.horizon, include_target=False)
         context_bars: pd.DataFrame | None = None
+        current_regime = "tactical-only"
 
         if request.use_dual_timeframe:
             context_bars = self.provider.fetch(
@@ -79,6 +82,7 @@ class AnalysisService:
             )
             training_features = enrich_with_daily_context(training_features, context_bars)
             live_features = enrich_with_daily_context(live_features, context_bars)
+            current_regime = regime_label(live_features.iloc[-1])
 
         model = train_model(training_features, purge=request.horizon)
         predicted_return = float(model.predict(live_features.iloc[[-1]])[0])
@@ -100,6 +104,7 @@ class AnalysisService:
             signal,
             request.horizon,
             context_bars,
+            current_regime,
         )
 
     def analyze_watchlist(self, symbols: list[str], request: AnalysisRequest) -> WatchlistAnalysis:
