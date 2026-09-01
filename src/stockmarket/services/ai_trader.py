@@ -70,6 +70,8 @@ def cycle_fingerprint(analyses: dict[str, SymbolAnalysis], config: AITraderConfi
         limits.max_daily_trades,
         round(limits.max_daily_loss_pct, 6),
         round(limits.volatility_target_pct, 6),
+        round(limits.max_pairwise_correlation, 6),
+        round(limits.correlation_penalty_floor, 6),
     )
     return market + (settings,)
 
@@ -85,6 +87,7 @@ class AITraderService:
         config: AITraderConfig,
         prices: dict[str, float] | None = None,
         orders: list[dict] | None = None,
+        correlation_to_portfolio: float = 0.0,
     ) -> TradeDecision:
         config.validate()
         symbol = analysis.symbol.upper()
@@ -119,12 +122,28 @@ class AITraderService:
             latest = analysis.live_features.iloc[-1] if hasattr(analysis, "live_features") else None
             volatility = float(latest.get("volatility_10", 0.01)) if latest is not None else 0.01
             assessment = RiskEngine().assess_entry(
-                symbol, float(analysis.price), confidence, volatility, portfolio,
-                prices or {symbol: float(analysis.price)}, orders or [], config.allocation_pct, config.risk_limits,
+                symbol,
+                float(analysis.price),
+                confidence,
+                volatility,
+                portfolio,
+                prices or {symbol: float(analysis.price)},
+                orders or [],
+                config.allocation_pct,
+                config.risk_limits,
+                correlation_to_portfolio=correlation_to_portfolio,
             )
             if not assessment.approved:
                 return TradeDecision(decision="REJECT", quantity=0, reason=assessment.reason, **base)
-            return TradeDecision(decision="BUY", quantity=assessment.quantity, reason=f"Signal and model gates passed. {assessment.reason}", **base)
+            return TradeDecision(
+                decision="BUY",
+                quantity=assessment.quantity,
+                reason=(
+                    f"Signal and model gates passed. {assessment.reason} "
+                    f"Correlation adjustment {assessment.correlation_adjustment:.2f}."
+                ),
+                **base,
+            )
 
         if signal == "Sell":
             if position_qty <= 0:
