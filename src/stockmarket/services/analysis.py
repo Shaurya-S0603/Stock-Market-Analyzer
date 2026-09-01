@@ -7,6 +7,7 @@ import pandas as pd
 
 from ..backtest import run_backtest
 from ..benchmarks import ModelGate, assess_model_gate, benchmark_models
+from ..context_features import enrich_with_tactical_context
 from ..features import build_features
 from ..modeling import ModelResult, train_model
 from ..multitimeframe import enrich_with_daily_context
@@ -30,6 +31,7 @@ class AnalysisRequest:
     slippage_rate: float
     context_period: str = "6mo"
     context_interval: str = "1d"
+    benchmark_symbol: str = "SPY"
 
     @property
     def round_trip_cost(self) -> float:
@@ -65,6 +67,21 @@ class WatchlistAnalysis:
 class AnalysisService:
     def __init__(self, provider: MarketProvider):
         self.provider = provider
+        self._benchmark_cache: dict[tuple[str, str, str], pd.DataFrame | None] = {}
+
+    def _benchmark_bars(self, request: AnalysisRequest) -> pd.DataFrame | None:
+        key = (request.benchmark_symbol.upper(), request.period, request.interval)
+        if key not in self._benchmark_cache:
+            try:
+                self._benchmark_cache[key] = self.provider.fetch(
+                    request.benchmark_symbol,
+                    request.period,
+                    request.interval,
+                    minimum_rows=80,
+                )
+            except (RuntimeError, ValueError):
+                self._benchmark_cache[key] = None
+        return self._benchmark_cache[key]
 
     def analyze_symbol(self, symbol: str, request: AnalysisRequest) -> SymbolAnalysis:
         bars = self.provider.fetch(symbol, request.period, request.interval)
@@ -83,6 +100,10 @@ class AnalysisService:
             training_features = enrich_with_daily_context(training_features, context_bars)
             live_features = enrich_with_daily_context(live_features, context_bars)
             current_regime = regime_label(live_features.iloc[-1])
+
+        benchmark_bars = bars if symbol.upper() == request.benchmark_symbol.upper() else self._benchmark_bars(request)
+        training_features = enrich_with_tactical_context(training_features, bars, benchmark_bars)
+        live_features = enrich_with_tactical_context(live_features, bars, benchmark_bars)
 
         model = train_model(training_features, purge=request.horizon)
         predicted_return = float(model.predict(live_features.iloc[[-1]])[0])
