@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from ..storage import Store
 from ..trading import Fill, PaperPortfolio
 from .adaptive_exits import evaluate_adaptive_exit
+from .persistent_state import PersistentPaperState
 
 
 @dataclass(frozen=True)
@@ -31,11 +32,16 @@ class RiskPolicy:
 
 
 class PortfolioService:
-    """Coordinates paper execution, persistence, and risk automation."""
+    """Coordinates paper execution, order persistence, and account-state recovery."""
 
-    def __init__(self, portfolio: PaperPortfolio, store: Store):
+    def __init__(self, portfolio: PaperPortfolio, store: Store, paper_state: PersistentPaperState | None = None):
         self.portfolio = portfolio
         self.store = store
+        self.paper_state = paper_state
+
+    def persist_state(self) -> None:
+        if self.paper_state is not None:
+            self.paper_state.save(self.portfolio)
 
     def execute(self, symbol: str, side: str, quantity: int, price: float, reason: str = "manual") -> Fill:
         fill = self.portfolio.execute(symbol, side, quantity, price, reason=reason)
@@ -48,6 +54,7 @@ class PortfolioService:
             fill.realized_pnl,
             fill.reason,
         )
+        self.persist_state()
         return fill
 
     def apply_risk_policy(self, latest_prices: dict[str, float], policy: RiskPolicy) -> list[str]:

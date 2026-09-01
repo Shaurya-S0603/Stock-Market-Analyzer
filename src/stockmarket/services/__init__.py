@@ -9,6 +9,7 @@ from .experiment_registry import ExperimentRecord, ExperimentRegistry
 from .journal import JournalService, TraderCycleSummary
 from .opportunity import OpportunityRanker, RankedOpportunity
 from .paper_strategy import PaperOnlyPortfolioStrategy, PaperStrategyCycleResult
+from .persistent_state import PersistentPaperState
 from .portfolio import PortfolioService, RiskPolicy
 from .portfolio_backtest import PortfolioFoldResult, PortfolioWalkForwardReport, run_portfolio_walk_forward
 from .portfolio_cycle import PortfolioCycleService, PortfolioResearchCycle, PortfolioSignalState
@@ -26,6 +27,7 @@ __all__ = [
     "build_return_correlation_matrix", "candidate_portfolio_correlation", "ExperimentRecord", "ExperimentRegistry",
     "DriftReport", "detect_experiment_drift", "PortfolioFoldResult", "PortfolioWalkForwardReport",
     "run_portfolio_walk_forward", "PaperOnlyPortfolioStrategy", "PaperStrategyCycleResult", "PortfolioCycleService",
-    "PortfolioResearchCycle", "PortfolioSignalState", "PortfolioService", "RiskPolicy", "RiskAssessment", "RiskEngine",
-    "RiskLimits", "SymbolAnalysis", "WatchlistAnalysis", "JournalService", "TraderCycleSummary",
+    "PortfolioResearchCycle", "PortfolioSignalState", "PersistentPaperState", "PortfolioService", "RiskPolicy",
+    "RiskAssessment", "RiskEngine", "RiskLimits", "SymbolAnalysis", "WatchlistAnalysis", "JournalService",
+    "TraderCycleSummary",
 ]
