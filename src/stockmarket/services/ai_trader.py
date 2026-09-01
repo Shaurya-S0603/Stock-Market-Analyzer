@@ -111,6 +111,20 @@ class AITraderService:
             return TradeDecision(decision="OFF", quantity=0, reason="AI Trader is disabled.", **base)
         if signal == "Hold":
             return TradeDecision(decision="HOLD", quantity=0, reason="Current signal does not cross an entry or exit threshold.", **base)
+
+        # Entry evidence gates should never trap an already-open paper position.
+        # A valid Sell signal exits the simulated long using the actual held quantity,
+        # even if the model gate/confidence has deteriorated since entry.
+        if signal == "Sell":
+            if position_qty <= 0:
+                return TradeDecision(decision="REJECT", quantity=0, reason="Sell signal ignored because no long paper position is open.", **base)
+            return TradeDecision(
+                decision="SELL",
+                quantity=position_qty,
+                reason="Existing paper position exit approved; entry-only model/confidence gates do not block exits.",
+                **base,
+            )
+
         if not model_gate_passed:
             return TradeDecision(decision="REJECT", quantity=0, reason="Model evidence gate did not pass for this symbol.", **base)
         if confidence < config.min_confidence:
@@ -144,11 +158,6 @@ class AITraderService:
                 ),
                 **base,
             )
-
-        if signal == "Sell":
-            if position_qty <= 0:
-                return TradeDecision(decision="REJECT", quantity=0, reason="Sell signal ignored because no long paper position is open.", **base)
-            return TradeDecision(decision="SELL", quantity=position_qty, reason="Exit signal, confidence, and model evidence gates passed.", **base)
 
         return TradeDecision(decision="HOLD", quantity=0, reason="Unsupported signal was treated as hold.", **base)
 

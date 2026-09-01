@@ -18,7 +18,7 @@ def _state(symbol: str, edge: float, confidence: float, target: float):
     return PortfolioSignalState(symbol, analysis, True, "passed", target)
 
 
-def test_paper_strategy_uses_rank_before_scarce_cash(tmp_path) -> None:
+def test_paper_strategy_prioritizes_rank_before_lower_scored_entries(tmp_path) -> None:
     cycle = PortfolioResearchCycle(
         states={
             "AAPL": _state("AAPL", 0.010, 0.80, 30.0),
@@ -47,7 +47,8 @@ def test_paper_strategy_uses_rank_before_scarce_cash(tmp_path) -> None:
     assert result.decisions[0].symbol == "NVDA"
     assert result.decisions[0].executed
     assert portfolio.positions["NVDA"].quantity > 0
-    assert portfolio.positions.get("AAPL") is None
+    assert portfolio.positions["AAPL"].quantity > 0
+    assert portfolio.positions["NVDA"].quantity > portfolio.positions["AAPL"].quantity
 
 
 def test_observe_mode_never_changes_paper_positions(tmp_path) -> None:

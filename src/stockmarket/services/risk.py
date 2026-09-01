@@ -145,26 +145,50 @@ class RiskEngine:
         volatility_pct = max(abs(float(recent_volatility)) * 100.0, 0.05)
         volatility_adjustment = min(1.0, max(0.25, limits.volatility_target_pct / volatility_pct))
         confidence_adjustment = min(1.0, max(0.25, float(confidence)))
-        target_budget = (
-            portfolio.cash
-            * (target_allocation_pct / 100.0)
+
+        # target_allocation_pct is a portfolio-equity budget. The optimizer has
+        # already ranked opportunities, so calculate the base budget from equity
+        # instead of repeatedly taking a percentage of the remaining cash.
+        base_target_budget = equity * (target_allocation_pct / 100.0)
+        adjusted_target_budget = (
+            base_target_budget
             * confidence_adjustment
             * volatility_adjustment
             * correlation_adjustment
         )
         exposure_room = max(equity * limits.max_portfolio_exposure_pct / 100.0 - current_exposure_value, 0.0)
-        allocation_value = min(target_budget, symbol_capacity, exposure_room, portfolio.cash)
+        hard_capacity = min(symbol_capacity, exposure_room, portfolio.cash)
         estimated_unit_cost = price * (1.0 + portfolio.slippage_rate) * (1.0 + portfolio.commission_rate)
-        quantity = int(allocation_value / estimated_unit_cost) if estimated_unit_cost > 0 else 0
+        allocation_value = min(adjusted_target_budget, hard_capacity)
+
+        # PaperPortfolio trades whole shares. If the requested base allocation and
+        # every hard cap can afford one share, soft confidence/volatility scaling
+        # must not round an otherwise valid trade down to zero.
+        whole_share_floor_applied = False
+        if (
+            estimated_unit_cost > 0
+            and base_target_budget + 1e-9 >= estimated_unit_cost
+            and hard_capacity + 1e-9 >= estimated_unit_cost
+            and allocation_value + 1e-9 < estimated_unit_cost
+        ):
+            allocation_value = estimated_unit_cost
+            whole_share_floor_applied = True
+
+        quantity = int((allocation_value + 1e-9) / estimated_unit_cost) if estimated_unit_cost > 0 else 0
         if quantity < 1:
-            return reject("Risk-adjusted allocation is too small for one paper share.")
+            return reject(
+                "Risk-adjusted allocation cannot fund one paper share within the configured allocation, cash, and exposure limits."
+            )
         projected_value = current_exposure_value + quantity * price
         projected_exposure_pct = projected_value / equity * 100.0 if equity > 0 else 0.0
         remaining_after_order = max(symbol_capacity - quantity * price, 0.0)
+        reason = "Portfolio, symbol-allocation, and correlation risk checks passed."
+        if whole_share_floor_applied:
+            reason += " Whole-share sizing floor applied within the original target budget and hard risk caps."
         return RiskAssessment(
             True,
             quantity,
-            "Portfolio, symbol-allocation, and correlation risk checks passed.",
+            reason,
             projected_exposure_pct,
             quantity * price,
             volatility_adjustment,
