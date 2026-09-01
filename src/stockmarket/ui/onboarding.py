@@ -5,7 +5,7 @@ import os
 
 import streamlit as st
 
-from ..services import AITraderConfig, RiskLimits, TraderMode
+from ..services import AITraderConfig, PersistentPaperState, RiskLimits, TraderMode
 from ..storage import Store
 from .components import callout, kpi_grid, page_header, section_header
 from .sidebar import load_settings, parse_watchlist, save_settings
@@ -144,7 +144,9 @@ def persist_portfolio_setup(setup: dict) -> None:
 
 
 def clear_portfolio_setup() -> None:
-    _profile_store().clear_portfolio_profile()
+    store = _profile_store()
+    store.clear_portfolio_profile()
+    PersistentPaperState(store.path).reset()
     for key in (
         "portfolio_setup",
         "portfolio_onboarding_complete",
