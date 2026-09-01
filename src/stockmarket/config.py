@@ -6,8 +6,8 @@ import os
 class Settings:
     symbol: str = "MSFT"
     period: str = "60d"
-    interval: str = "5m"
-    horizon: int = 12
+    interval: str = "1h"
+    horizon: int = 6
     starting_cash: float = 100_000.0
     commission_rate: float = 0.001
     slippage_rate: float = 0.0005

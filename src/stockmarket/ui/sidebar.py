@@ -5,12 +5,16 @@ from dataclasses import asdict, dataclass
 import streamlit as st
 
 
+INTRADAY_PERIODS = ["5d", "10d", "30d", "60d"]
+INTRADAY_INTERVALS = ["5m", "15m", "30m", "1h"]
+
+
 @dataclass(frozen=True)
 class UISettings:
     watchlist: list[str]
     period: str = "60d"
-    interval: str = "5m"
-    horizon: int = 12
+    interval: str = "1h"
+    horizon: int = 6
     buy_threshold: float = 0.005
     sell_threshold: float = -0.005
     starting_cash: float = 100_000.0
@@ -40,7 +44,8 @@ def parse_watchlist(raw_watchlist: str) -> list[str]:
 
 
 def effective_period(period: str, interval: str) -> str:
-    if interval in {"5m", "15m", "30m"} and period not in {"5d", "10d", "30d", "60d"}:
+    """Keep primary intraday requests inside Yahoo Finance's recent-history window."""
+    if interval in INTRADAY_INTERVALS and period not in INTRADAY_PERIODS:
         return "60d"
     return period
 
@@ -81,11 +86,25 @@ def render_settings_form(settings: UISettings) -> UISettings:
         "Use Portfolio Configuration below this form to change symbols, allocations, cash reserve, or starting capital."
     )
     row = st.columns(3)
-    periods = ["5d", "10d", "30d", "60d", "3mo", "6mo"]
-    intervals = ["5m", "15m", "30m", "1h"]
-    period = row[0].selectbox("History window", periods, index=periods.index(settings.period if settings.period in periods else "60d"))
-    interval = row[1].selectbox("Bar interval", intervals, index=intervals.index(settings.interval))
-    horizon = row[2].slider("Forecast horizon", 1, 48, settings.horizon, help="Bars ahead represented by the prediction target.")
+    period = row[0].selectbox(
+        "History window",
+        INTRADAY_PERIODS,
+        index=INTRADAY_PERIODS.index(settings.period if settings.period in INTRADAY_PERIODS else "60d"),
+        help="Primary intraday research is capped at 60 days to stay inside Yahoo Finance's supported recent-history window.",
+    )
+    interval = row[1].selectbox(
+        "Bar interval",
+        INTRADAY_INTERVALS,
+        index=INTRADAY_INTERVALS.index(settings.interval if settings.interval in INTRADAY_INTERVALS else "1h"),
+        help="1-hour bars are the default research feed because they reduce short-term noise while retaining intraday structure.",
+    )
+    horizon = row[2].slider(
+        "Forecast horizon",
+        1,
+        48,
+        settings.horizon,
+        help="Bars ahead represented by the prediction target. The default is 6 hourly bars, approximately one regular trading session.",
+    )
     st.markdown("#### Signal thresholds")
     signal = st.columns(2)
     buy_threshold = signal[0].slider("Buy threshold (%)", 0.1, 10.0, settings.buy_threshold * 100.0, 0.1) / 100.0
