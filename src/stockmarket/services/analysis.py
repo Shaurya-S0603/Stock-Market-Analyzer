@@ -6,7 +6,7 @@ from typing import Protocol
 import pandas as pd
 
 from ..backtest import run_backtest
-from ..benchmarks import ModelGate, assess_model_gate, benchmark_models
+from ..benchmarks import ModelGate, assess_model_gate, benchmark_models, best_benchmark, ensemble_benchmark_models
 from ..context_features import enrich_with_tactical_context
 from ..features import build_features
 from ..modeling import ModelResult, train_model
@@ -159,6 +159,10 @@ class AnalysisService:
     def benchmark_report(self, analysis: SymbolAnalysis, splits: int = 3) -> tuple[list[dict[str, float | str]], ModelGate]:
         rows = benchmark_models(analysis.training_features, splits=splits, purge=analysis.horizon)
         return rows, assess_model_gate(rows)
+
+    def ensemble_benchmark_report(self, analysis: SymbolAnalysis, splits: int = 3) -> tuple[list[dict[str, float | str]], dict[str, float | str]]:
+        rows = ensemble_benchmark_models(analysis.training_features, splits=splits, purge=analysis.horizon)
+        return rows, best_benchmark(rows)
 
     def backtest(self, analysis: SymbolAnalysis, request: AnalysisRequest, starting_cash: float, test_fraction: float = 0.2) -> dict:
         features = analysis.training_features
