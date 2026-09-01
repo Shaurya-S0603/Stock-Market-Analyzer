@@ -4,6 +4,7 @@ from .analytics import TraderAnalytics, build_trader_analytics
 from .analysis import AnalysisRequest, AnalysisService, SymbolAnalysis, WatchlistAnalysis
 from .attribution import PortfolioAttribution, SymbolAttribution, build_portfolio_attribution
 from .correlation import build_return_correlation_matrix, candidate_portfolio_correlation
+from .drift import DriftReport, detect_experiment_drift
 from .experiment_registry import ExperimentRecord, ExperimentRegistry
 from .journal import JournalService, TraderCycleSummary
 from .opportunity import OpportunityRanker, RankedOpportunity
@@ -43,6 +44,8 @@ __all__ = [
     "candidate_portfolio_correlation",
     "ExperimentRecord",
     "ExperimentRegistry",
+    "DriftReport",
+    "detect_experiment_drift",
     "PaperOnlyPortfolioStrategy",
     "PaperStrategyCycleResult",
     "PortfolioCycleService",

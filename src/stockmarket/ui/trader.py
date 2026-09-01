@@ -13,6 +13,7 @@ from ..services import (
     RiskPolicy,
     TraderMode,
     cycle_fingerprint,
+    detect_experiment_drift,
 )
 from .context import AppContext
 
@@ -59,9 +60,10 @@ def _portfolio_allocations(ctx: AppContext) -> dict[str, float]:
     return {str(symbol).upper(): float(weight) for symbol, weight in profile.get("allocations", {}).items()}
 
 
-def _register_experiments(ctx: AppContext, research_cycle) -> list[dict]:
+def _register_experiments(ctx: AppContext, research_cycle) -> tuple[list[dict], list[dict]]:
     registry = ExperimentRegistry(ctx.store.path)
     records: list[dict] = []
+    drift_rows: list[dict] = []
     for symbol, state in research_cycle.states.items():
         benchmark: dict = {"production_gate_passed": bool(state.model_gate_passed), "production_gate_reason": state.model_gate_reason}
         try:
@@ -71,7 +73,18 @@ def _register_experiments(ctx: AppContext, research_cycle) -> list[dict]:
             benchmark["challenger_error"] = str(exc)
         record = registry.record(state.analysis, ctx.request, benchmark)
         records.append({"experiment_id": record.experiment_id, "symbol": symbol, "model_hash": record.model_hash, "regime": record.regime})
-    return records
+
+        history = registry.recent(symbol, limit=10)
+        baseline = next((row for row in history if row["experiment_id"] != record.experiment_id), None)
+        if baseline is not None:
+            current = {
+                "metrics": record.metrics,
+                "feature_stats": record.feature_stats,
+            }
+            report = detect_experiment_drift(current, baseline)
+            registry.record_drift(record.experiment_id, symbol, report)
+            drift_rows.append({"symbol": symbol, "status": report.status, "score": report.score, "reasons": report.reasons})
+    return records, drift_rows
 
 
 def run_trader_cycle(ctx: AppContext, config: AITraderConfig, result=None) -> list:
@@ -90,7 +103,7 @@ def run_trader_cycle(ctx: AppContext, config: AITraderConfig, result=None) -> li
         allocations,
         watchlist=result,
     )
-    experiments = _register_experiments(ctx, research_cycle)
+    experiments, drift_rows = _register_experiments(ctx, research_cycle)
     strategy_result = PaperOnlyPortfolioStrategy().run(research_cycle, ctx.portfolio_service, config)
     decisions = strategy_result.decisions
     cycle = JournalService(ctx.store).record_cycle(decisions, config.mode, ctx.portfolio, prices)
@@ -98,6 +111,7 @@ def run_trader_cycle(ctx: AppContext, config: AITraderConfig, result=None) -> li
     st.session_state.ai_trader_last_ranked = [item.__dict__ for item in strategy_result.ranked_opportunities]
     st.session_state.ai_trader_last_optimized = [item.__dict__ for item in strategy_result.optimized_opportunities]
     st.session_state.ai_trader_last_experiments = experiments
+    st.session_state.ai_trader_last_drift = drift_rows
     st.session_state.ai_trader_last_cycle = cycle.__dict__
     return decisions
 
