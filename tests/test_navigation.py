@@ -18,6 +18,7 @@ pages = {
     ],
     "Research": [
         st.Page(lambda: st.write("models"), title="Model Analytics", url_path="model-analytics"),
+        st.Page(lambda: st.write("research"), title="Research Lab", url_path="research-lab"),
         st.Page(lambda: st.write("backtest"), title="Backtesting", url_path="backtesting"),
         st.Page(lambda: st.write("risk"), title="Risk Analytics", url_path="risk-analytics"),
     ],
