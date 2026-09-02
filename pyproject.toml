@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stock-market-analyzer"
-version = "1.0.0"
+version = "1.0.1"
 description = "Portfolio-aware quantitative research, validation, stress testing, and persistent paper-trading lab"
 requires-python = ">=3.11,<3.15"
 
