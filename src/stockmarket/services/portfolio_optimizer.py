@@ -87,16 +87,24 @@ class PortfolioOptimizer:
                     config.risk_limits.correlation_penalty_floor,
                     1.0 - scaled * (1.0 - config.risk_limits.correlation_penalty_floor),
                 )
-            risk_adjusted_edge = edge * max(confidence, 0.01) / volatility_pct
-            regime_penalty = 0.85 if float(latest.get("regime_high_volatility", 0.0) or 0.0) >= 0.5 else 1.0
-            score = max(risk_adjusted_edge * regime_penalty * correlation_adjustment, 1e-12)
+
+            # Return-seeking score: expected cost-adjusted edge remains primary, while
+            # volatility acts as a square-root penalty rather than fully dividing the
+            # signal away. Borderline evidence is allowed only with reduced sizing.
+            evidence_multiplier = float(getattr(state, "evidence_multiplier", 1.0))
+            risk_adjusted_edge = edge * max(confidence, 0.01) / np.sqrt(max(volatility_pct, 0.05))
+            regime_penalty = 0.90 if float(latest.get("regime_high_volatility", 0.0) or 0.0) >= 0.5 else 1.0
+            score = max(risk_adjusted_edge * regime_penalty * correlation_adjustment * evidence_multiplier, 1e-12)
             prepared.append((item, score, sleeve_capacity, current_weight, volatility_pct, max_correlation, correlation_adjustment))
 
         total_score = sum(row[1] for row in prepared)
         optimized: list[OptimizedOpportunity] = []
         for item, score, sleeve_capacity, current_weight, volatility_pct, max_correlation, correlation_adjustment in prepared:
+            state = cycle.states[item.symbol]
             proportional_budget = cycle_budget_pct * score / total_score if total_score > 0 else 0.0
+            evidence_multiplier = float(getattr(state, "evidence_multiplier", 1.0))
             per_entry_cap = min(float(config.allocation_pct), float(config.risk_limits.max_position_pct), sleeve_capacity)
+            per_entry_cap *= max(min(evidence_multiplier, 1.0), 0.0)
             target_entry_pct = min(proportional_budget, per_entry_cap)
             if max_correlation > config.risk_limits.max_pairwise_correlation:
                 target_entry_pct = 0.0
@@ -111,7 +119,8 @@ class PortfolioOptimizer:
                     net_edge=float(item.net_edge),
                     volatility_pct=float(volatility_pct),
                     reason=(
-                        f"Risk-adjusted edge score {score:.6f}; sleeve room {sleeve_capacity:.2f}%; "
+                        f"Return-seeking edge score {score:.6f}; evidence {getattr(state, 'evidence_tier', 'strong')} "
+                        f"({evidence_multiplier:.2f}x size); sleeve room {sleeve_capacity:.2f}%; "
                         f"cycle budget {cycle_budget_pct:.2f}%; max portfolio correlation {max_correlation:.2f}."
                     ),
                     max_correlation=float(max_correlation),
