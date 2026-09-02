@@ -9,6 +9,7 @@ def _state(symbol: str, edge: float, confidence: float, gate: bool = True, targe
         symbol=symbol,
         predicted_return=edge + 0.002,
         signal=SimpleNamespace(action=signal, confidence=confidence, net_edge=edge),
+        adaptive_buy_threshold=0.003,
     )
     return PortfolioSignalState(symbol, analysis, gate, "gate", target)
 
@@ -20,13 +21,15 @@ def test_ranker_prioritizes_eligible_edge_then_confidence() -> None:
             "NVDA": _state("NVDA", 0.014, 0.72),
             "MSFT": _state("MSFT", 0.020, 0.90, gate=False),
             "GOOGL": _state("GOOGL", 0.008, 0.60),
+            "AMZN": _state("AMZN", 0.003, 0.60),
         },
         unavailable={},
     )
     ranked = OpportunityRanker().rank(cycle, min_confidence=0.65)
-    assert [item.symbol for item in ranked[:2]] == ["NVDA", "AAPL"]
-    assert ranked[0].eligible and ranked[1].eligible
-    assert not ranked[2].eligible and not ranked[3].eligible
+    assert [item.symbol for item in ranked[:3]] == ["NVDA", "AAPL", "GOOGL"]
+    assert all(item.eligible for item in ranked[:3])
+    assert not ranked[3].eligible and not ranked[4].eligible
+    assert {ranked[3].symbol, ranked[4].symbol} == {"MSFT", "AMZN"}
 
 
 def test_ranker_rejects_symbols_without_allocation() -> None:
