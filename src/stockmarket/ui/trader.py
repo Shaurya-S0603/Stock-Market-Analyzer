@@ -18,26 +18,56 @@ from ..services import (
 from .context import AppContext
 
 
+POLICY_VERSION = 2
+
+
+def _legacy_default(value, old, new):
+    return new if value == old else value
+
+
 def load_trader_config() -> AITraderConfig:
     stored = st.session_state.get("ai_trader_config", {})
+    legacy = isinstance(stored, dict) and int(stored.get("policy_version", 1)) < POLICY_VERSION
     try:
         mode = TraderMode(stored.get("mode", TraderMode.OFF))
     except ValueError:
         mode = TraderMode.OFF
     risk_data = stored.get("risk_limits", {}) if isinstance(stored.get("risk_limits", {}), dict) else {}
+
+    min_confidence = float(stored.get("min_confidence", 0.58))
+    allocation_pct = float(stored.get("allocation_pct", 7.5))
+    max_position_pct = float(risk_data.get("max_position_pct", 12.0))
+    max_exposure_pct = float(risk_data.get("max_portfolio_exposure_pct", 70.0))
+    max_positions = int(risk_data.get("max_open_positions", 8))
+    max_daily_trades = int(risk_data.get("max_daily_trades", 16))
+    volatility_target_pct = float(risk_data.get("volatility_target_pct", 1.75))
+    max_pairwise_correlation = float(risk_data.get("max_pairwise_correlation", 0.92))
+    correlation_penalty_floor = float(risk_data.get("correlation_penalty_floor", 0.40))
+
+    if legacy:
+        min_confidence = float(_legacy_default(min_confidence, 0.65, 0.58))
+        allocation_pct = float(_legacy_default(allocation_pct, 5.0, 7.5))
+        max_position_pct = float(_legacy_default(max_position_pct, 10.0, 12.0))
+        max_exposure_pct = float(_legacy_default(max_exposure_pct, 60.0, 70.0))
+        max_positions = int(_legacy_default(max_positions, 6, 8))
+        max_daily_trades = int(_legacy_default(max_daily_trades, 12, 16))
+        volatility_target_pct = float(_legacy_default(volatility_target_pct, 1.5, 1.75))
+        max_pairwise_correlation = float(_legacy_default(max_pairwise_correlation, 0.90, 0.92))
+        correlation_penalty_floor = float(_legacy_default(correlation_penalty_floor, 0.35, 0.40))
+
     return AITraderConfig(
         mode=mode,
-        min_confidence=float(stored.get("min_confidence", 0.65)),
-        allocation_pct=float(stored.get("allocation_pct", 5.0)),
+        min_confidence=min_confidence,
+        allocation_pct=allocation_pct,
         risk_limits=RiskLimits(
-            max_position_pct=float(risk_data.get("max_position_pct", 10.0)),
-            max_portfolio_exposure_pct=float(risk_data.get("max_portfolio_exposure_pct", 60.0)),
-            max_open_positions=int(risk_data.get("max_open_positions", 6)),
-            max_daily_trades=int(risk_data.get("max_daily_trades", 12)),
+            max_position_pct=max_position_pct,
+            max_portfolio_exposure_pct=max_exposure_pct,
+            max_open_positions=max_positions,
+            max_daily_trades=max_daily_trades,
             max_daily_loss_pct=float(risk_data.get("max_daily_loss_pct", 3.0)),
-            volatility_target_pct=float(risk_data.get("volatility_target_pct", 1.5)),
-            max_pairwise_correlation=float(risk_data.get("max_pairwise_correlation", 0.90)),
-            correlation_penalty_floor=float(risk_data.get("correlation_penalty_floor", 0.35)),
+            volatility_target_pct=volatility_target_pct,
+            max_pairwise_correlation=max_pairwise_correlation,
+            correlation_penalty_floor=correlation_penalty_floor,
         ),
     )
 
@@ -45,6 +75,7 @@ def load_trader_config() -> AITraderConfig:
 def save_trader_config(config: AITraderConfig) -> None:
     config.validate()
     st.session_state.ai_trader_config = {
+        "policy_version": POLICY_VERSION,
         "mode": config.mode.value,
         "min_confidence": config.min_confidence,
         "allocation_pct": config.allocation_pct,
@@ -65,7 +96,12 @@ def _register_experiments(ctx: AppContext, research_cycle) -> tuple[list[dict], 
     records: list[dict] = []
     drift_rows: list[dict] = []
     for symbol, state in research_cycle.states.items():
-        benchmark: dict = {"production_gate_passed": bool(state.model_gate_passed), "production_gate_reason": state.model_gate_reason}
+        benchmark: dict = {
+            "trading_gate_passed": bool(state.model_gate_passed),
+            "trading_gate_reason": state.model_gate_reason,
+            "trading_evidence_tier": getattr(state, "evidence_tier", "unknown"),
+            "trading_evidence_size_multiplier": float(getattr(state, "evidence_multiplier", 0.0)),
+        }
         try:
             _, best = ctx.analysis_service.ensemble_benchmark_report(state.analysis)
             benchmark["best_challenger"] = best
@@ -157,9 +193,11 @@ def ranked_opportunities_frame() -> pd.DataFrame:
         "eligible": "Eligible",
         "signal": "Signal",
         "confidence": "Confidence",
+        "required_confidence": "Required Confidence",
         "predicted_return": "Predicted Return",
         "net_edge": "Net Edge",
         "model_gate_passed": "Model Gate",
+        "evidence_tier": "Evidence Tier",
         "target_weight": "Target Weight",
         "reason": "Reason",
     })
