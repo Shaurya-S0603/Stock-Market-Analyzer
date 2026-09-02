@@ -1,29 +1,24 @@
-# QuantEdge Stock Market Analyzer
+# QuantEdge Stock Market Analyzer v1.0
 
-A professional Streamlit market-research and **paper-trading** workstation with dual-timeframe forecasting, portfolio-aware capital allocation, leakage-safe validation, calibrated model evidence, multi-symbol risk controls, and persistent simulated execution.
+QuantEdge is a professional Streamlit quantitative-research and **paper-trading** workstation with dual-timeframe forecasting, portfolio-aware capital allocation, leakage-safe validation, calibrated model evidence, multi-symbol risk controls, strategy stress testing, and persistent simulated execution.
 
-> **Research and simulation only.** QuantEdge has no brokerage authentication, funding workflow, or real-money order endpoint. Forecasts, paper trades, allocations, and backtests are not personalized investment advice or guarantees of future performance.
+> **Research and simulation only.** QuantEdge has no brokerage authentication, funding workflow, or real-money order endpoint. Forecasts, allocations, backtests, and paper trades are not personalized investment advice or guarantees of future performance.
 
-## v0.7 Quant Research Engine
+## v1.0 highlights
 
-The v0.7 research stack upgrades the system end to end:
+### Quant research engine
 
 - **Dual timeframe:** `60d / 1h` tactical bars plus leakage-safe `6mo / 1d` context. Hourly rows only receive previously completed daily information.
 - **Regime detection:** bullish/bearish trend, range, volatility, and regime-strength features.
 - **Contextual features:** tactical return/volatility state, relative volume, gaps, ranges, trend persistence, time-of-day encoding, SPY-relative strength, and broader-market context.
 - **Improved targets:** raw future return, cost-adjusted return, profitable-after-cost labels, direction, magnitude, and action-style targets.
 - **Calibrated forecasts:** probability-of-profitable-outcome calibration with Brier scoring.
-- **Ensemble benchmarks:** simple baselines, ridge variants, context ensembles, and regime-aware challengers evaluated on identical purged folds.
+- **Ensemble benchmark ladder:** simple baselines, ridge variants, context ensembles, and regime-aware challengers evaluated on identical purged folds.
 - **Adaptive thresholds:** entry/exit edges respond to volatility, regime state, calibrated probability, and simulated costs.
-- **Portfolio optimizer:** scarce paper capital is assigned using expected edge, confidence, volatility, sleeve capacity, cash, and portfolio exposure.
-- **Correlation-aware risk:** highly correlated candidates are penalized or rejected instead of being mistaken for diversification.
-- **Adaptive exits:** ATR-scaled stops, trailing logic, time exits, signal reversals, confidence decay, and profit targets.
-- **Experiment registry:** model hash, features, data/config signature, validation metrics, regime, and challenger evidence are stored for reproducibility.
-- **Drift detection:** model-quality and feature-distribution deterioration can be flagged and persisted.
-- **Portfolio walk-forward:** the full multi-symbol allocation/risk strategy is evaluated across purged expanding folds with next-bar execution.
-- **Persistent simulation infrastructure:** simulated cash and positions survive process/session restarts when `PAPER_DB_PATH` points to durable storage, and `paper_worker.py` can run one idempotent paper cycle from an external scheduler.
+- **Champion / challenger governance:** research-only promotion recommendations require RMSE improvement, acceptable directional behavior, positive strategy-return improvement, and enough purged folds. Models are never silently swapped.
+- **Experiment registry + drift:** model hash, features, data/config signature, validation metrics, regime, challenger evidence, and drift events are stored for reproducibility.
 
-## Portfolio Intelligence
+### Portfolio Intelligence
 
 On first launch the app creates a simulated portfolio profile:
 
@@ -36,17 +31,52 @@ On first launch the app creates a simulated portfolio profile:
 
 A symbol allocation is a **maximum capital sleeve**, not an instruction to immediately buy that percentage. A simulated entry still needs signal evidence, calibrated confidence, positive cost-adjusted edge, available cash, and portfolio risk capacity.
 
+The portfolio engine adds:
+
+- opportunity ranking by edge, confidence, volatility, and available sleeve capacity;
+- correlation-aware risk and concentration rejection;
+- portfolio exposure and per-symbol ceilings;
+- target-vs-actual allocation monitoring;
+- persistent P&L attribution and per-symbol strategy statistics;
+- separate manual paper rebalancing.
+
+### AI Trader
+
+- **OFF:** no automated decision execution.
+- **OBSERVE:** evaluate and journal decisions without modifying the paper portfolio.
+- **PAPER AUTO:** execute approved simulated fills inside `PaperPortfolio` only.
+
+The trader includes:
+
+- portfolio-aware whole-share sizing;
+- model/evidence, confidence, allocation, cash, exposure, trade-count, loss, and correlation gates;
+- affordable one-share protection so soft sizing adjustments cannot collapse a valid paper entry to quantity zero;
+- full-position Sell exits for existing simulated positions;
+- ATR-scaled, trailing, time, signal-reversal, confidence-decay, and profit-target exits;
+- duplicate-market-bar protection;
+- persistent decisions, orders, account state, and portfolio snapshots.
+
+## Research Lab
+
+The `/research-lab` workspace adds four v1 research surfaces:
+
+1. **Champion / Challenger** — compares the production candidate against extended ensemble challengers with explicit promotion gates.
+2. **Monte Carlo** — block-bootstrap stress testing of leakage-safe holdout strategy returns and drawdowns.
+3. **Portfolio Walk-Forward** — evaluates the configured symbols together across purged expanding folds with costs, allocation sleeves, exposure caps, and correlation controls.
+4. **Experiments & Drift** — reads the persistent model registry and drift-event audit trail.
+
 ## Product surfaces
 
-- **Dashboard** — portfolio KPIs, target-vs-actual allocation, strategy state, and recent decisions.
+- **Dashboard** — portfolio KPIs, target-vs-actual allocation, strategy state, and recent AI decisions.
 - **Markets** — market structure, signals, confidence, and cost-adjusted edge.
-- **AI Trader** — OFF / OBSERVE / PAPER AUTO, opportunity ranking, model gates, optimizer output, and paper execution.
-- **Portfolio** — cash/equity, positions, P&L attribution, allocation drift, and manual paper rebalancing.
+- **AI Trader** — OFF / OBSERVE / PAPER AUTO, opportunity ranking, gates, sizing, and paper execution.
+- **Portfolio** — cash/equity, positions, attribution, allocation drift, and manual paper rebalancing.
 - **Trade Journal** — persisted decisions, fills, cycles, and per-symbol statistics.
-- **Model Analytics** — purged validation, calibration, benchmark ladder, experiment evidence, and drift diagnostics.
-- **Backtesting** — single-symbol and portfolio-level leakage-aware simulations with costs and benchmark comparison.
-- **Risk Analytics** — exposure, allocation capacity, correlation concentration, daily limits, and risk events.
-- **Settings** — model/runtime assumptions and portfolio reconfiguration.
+- **Model Analytics** — holdout metrics, purged validation, calibration, benchmark ladder, and evidence gate.
+- **Research Lab** — champion/challenger governance, Monte Carlo stress tests, portfolio validation, experiments, and drift.
+- **Backtesting** — leakage-aware single-symbol simulation with costs and benchmark comparison.
+- **Risk Analytics** — exposure, allocation capacity, protective exits, daily limits, and risk events.
+- **Settings** — runtime assumptions and persistent portfolio reconfiguration.
 
 ## Research pipeline
 
@@ -61,7 +91,7 @@ A symbol allocation is a **maximum capital sleeve**, not an instruction to immed
                          ↓
               Calibrated probability
                          ↓
-           Purged benchmark evidence gate
+          Purged benchmark + governance
                          ↓
               Adaptive signal threshold
                          ↓
@@ -73,17 +103,17 @@ A symbol allocation is a **maximum capital sleeve**, not an instruction to immed
                          ↓
                 PAPER execution only
                          ↓
-          Journal + experiment + drift records
+   Journal + experiments + drift + stress testing
 ```
 
 ## Persistent paper simulation
 
-`PAPER_DB_PATH` defaults to `.data/paper_trading.db`. The same SQLite database stores the portfolio profile, orders, decisions, model/experiment records, paper-account state, and the external worker checkpoint.
+`PAPER_DB_PATH` defaults to `.data/paper_trading.db`. The SQLite database stores the portfolio profile, paper-account state, orders, decisions, model experiments, drift/risk events, snapshots, and the standalone worker checkpoint.
 
-A simulated fill immediately persists:
+A simulated fill persists:
 
 - current paper cash;
-- open symbol quantities;
+- open quantities;
 - average cost;
 - realized P&L;
 - commission/slippage configuration.
@@ -92,15 +122,13 @@ On a new Streamlit or worker process, the account is reconstructed when the stor
 
 ### One-cycle worker
 
-After completing onboarding at least once, a scheduler-capable host can run:
+After onboarding has created a portfolio profile, a scheduler-capable host can run:
 
 ```bash
 python paper_worker.py
 ```
 
-The worker reads the persisted portfolio profile, obtains current research data, runs one portfolio decision cycle, records journal data, persists any simulated fills, and exits. It **never routes an order to a broker**.
-
-The worker stores a post-cycle market/config/allocation/portfolio fingerprint. Calling it again on the same bar and unchanged account returns `unchanged` instead of repeating the simulated action.
+The worker reads the saved profile, obtains market/context data, runs one portfolio decision cycle, records decisions and simulated fills, persists account state, writes a post-cycle fingerprint, and exits. It **never routes an order to a broker**.
 
 Useful environment variables:
 
@@ -112,15 +140,13 @@ PAPER_MIN_CONFIDENCE=0.65
 PAPER_ENTRY_ALLOCATION_PCT=5
 ```
 
-A scheduler may invoke `paper_worker.py` periodically. The scheduler itself is deployment infrastructure and is intentionally separate from the Streamlit browser session.
+## Storage boundary
 
-## Important storage boundary
-
-SQLite is durable only when the filesystem containing `PAPER_DB_PATH` is durable. **Streamlit Community Cloud storage is ephemeral**, so its local `.data/` file should not be treated as permanent long-running strategy history. For persistent scheduled simulation, run the worker on a host with a persistent volume or migrate the storage implementation to a managed database.
+SQLite is durable only when the filesystem containing `PAPER_DB_PATH` is durable. **Streamlit Community Cloud local storage is ephemeral**, so `.data/` should not be treated as permanent long-running strategy history. Persistent scheduled simulation should run on infrastructure with a persistent disk/volume.
 
 ## Run locally
 
-Python 3.12 is recommended; CI validates Python 3.12, 3.13, and 3.14.
+Python 3.12 is recommended. CI validates Python 3.12, 3.13, and 3.14.
 
 ```bash
 python -m venv .venv
@@ -138,6 +164,6 @@ pytest -q
 python -m compileall -q StockMarketAnalyzer.py streamlit_app.py paper_worker.py src tests
 ```
 
-GitHub Actions runs the complete regression suite and source compilation on Python 3.12, 3.13, and 3.14 before release branches are merged.
+GitHub Actions executes the complete regression suite and source compilation before release changes are merged. For v1.0.0, a second release workflow waits for successful `main` CI before creating the `v1.0.0` tag and GitHub release.
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for deployment details.
+See [DEPLOYMENT.md](DEPLOYMENT.md) and [RELEASE_NOTES_v1.0.md](RELEASE_NOTES_v1.0.md).

@@ -7,6 +7,8 @@ from .correlation import build_return_correlation_matrix, candidate_portfolio_co
 from .drift import DriftReport, detect_experiment_drift
 from .experiment_registry import ExperimentRecord, ExperimentRegistry
 from .journal import JournalService, TraderCycleSummary
+from .model_governance import GovernanceDecision, assess_champion_challenger
+from .monte_carlo import MonteCarloSummary, run_monte_carlo_stress_test
 from .opportunity import OpportunityRanker, RankedOpportunity
 from .paper_strategy import PaperOnlyPortfolioStrategy, PaperStrategyCycleResult
 from .persistent_state import PersistentPaperState
@@ -25,7 +27,8 @@ __all__ = [
     "PaperRebalancePlan", "RebalanceInstruction", "build_rebalance_plan", "AnalysisRequest", "AnalysisService",
     "OpportunityRanker", "RankedOpportunity", "OptimizedOpportunity", "PortfolioOptimizer",
     "build_return_correlation_matrix", "candidate_portfolio_correlation", "ExperimentRecord", "ExperimentRegistry",
-    "DriftReport", "detect_experiment_drift", "PortfolioFoldResult", "PortfolioWalkForwardReport",
+    "DriftReport", "detect_experiment_drift", "GovernanceDecision", "assess_champion_challenger",
+    "MonteCarloSummary", "run_monte_carlo_stress_test", "PortfolioFoldResult", "PortfolioWalkForwardReport",
     "run_portfolio_walk_forward", "PaperOnlyPortfolioStrategy", "PaperStrategyCycleResult", "PortfolioCycleService",
     "PortfolioResearchCycle", "PortfolioSignalState", "PersistentPaperState", "PortfolioService", "RiskPolicy",
     "RiskAssessment", "RiskEngine", "RiskLimits", "SymbolAnalysis", "WatchlistAnalysis", "JournalService",
