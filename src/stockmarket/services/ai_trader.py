@@ -18,8 +18,8 @@ class TraderMode(StrEnum):
 @dataclass(frozen=True)
 class AITraderConfig:
     mode: TraderMode = TraderMode.OFF
-    min_confidence: float = 0.65
-    allocation_pct: float = 5.0
+    min_confidence: float = 0.58
+    allocation_pct: float = 7.5
     risk_limits: RiskLimits = RiskLimits()
 
     def validate(self) -> None:
@@ -43,6 +43,21 @@ class TradeDecision:
     model_gate_passed: bool
     reason: str
     executed: bool = False
+
+
+def required_entry_confidence(base_minimum: float, net_edge: float, entry_threshold: float) -> float:
+    """Return an edge-aware confidence floor for simulated long entries.
+
+    A candidate merely crossing the threshold must satisfy the configured minimum.
+    Stronger cost-adjusted edge can earn up to ten percentage points of confidence
+    relief, but the paper trader never accepts an entry below 52% calibrated
+    profitable probability.
+    """
+    base = min(max(float(base_minimum), 0.0), 1.0)
+    edge_floor = max(abs(float(entry_threshold)), 0.0005)
+    strength = max(float(net_edge), 0.0) / edge_floor
+    relief = min(max(strength - 1.0, 0.0) * 0.04, 0.10)
+    return max(0.52, base - relief)
 
 
 def cycle_fingerprint(analyses: dict[str, SymbolAnalysis], config: AITraderConfig) -> tuple:
@@ -113,8 +128,6 @@ class AITraderService:
             return TradeDecision(decision="HOLD", quantity=0, reason="Current signal does not cross an entry or exit threshold.", **base)
 
         # Entry evidence gates should never trap an already-open paper position.
-        # A valid Sell signal exits the simulated long using the actual held quantity,
-        # even if the model gate/confidence has deteriorated since entry.
         if signal == "Sell":
             if position_qty <= 0:
                 return TradeDecision(decision="REJECT", quantity=0, reason="Sell signal ignored because no long paper position is open.", **base)
@@ -126,11 +139,25 @@ class AITraderService:
             )
 
         if not model_gate_passed:
-            return TradeDecision(decision="REJECT", quantity=0, reason="Model evidence gate did not pass for this symbol.", **base)
-        if confidence < config.min_confidence:
-            return TradeDecision(decision="REJECT", quantity=0, reason=f"Signal confidence {confidence:.0%} is below the {config.min_confidence:.0%} minimum.", **base)
+            return TradeDecision(decision="REJECT", quantity=0, reason="Model trading-evidence gate did not pass for this symbol.", **base)
 
         if signal == "Buy":
+            entry_threshold = float(getattr(analysis, "adaptive_buy_threshold", 0.003))
+            required_confidence = required_entry_confidence(
+                config.min_confidence,
+                float(analysis.signal.net_edge),
+                entry_threshold,
+            )
+            if confidence < required_confidence:
+                return TradeDecision(
+                    decision="REJECT",
+                    quantity=0,
+                    reason=(
+                        f"Signal confidence {confidence:.0%} is below the edge-adjusted "
+                        f"{required_confidence:.0%} minimum."
+                    ),
+                    **base,
+                )
             if position_qty > 0:
                 return TradeDecision(decision="REJECT", quantity=0, reason="An open paper position already exists for this symbol.", **base)
             latest = analysis.live_features.iloc[-1] if hasattr(analysis, "live_features") else None
@@ -153,7 +180,8 @@ class AITraderService:
                 decision="BUY",
                 quantity=assessment.quantity,
                 reason=(
-                    f"Signal and model gates passed. {assessment.reason} "
+                    f"Signal and trading-evidence gates passed at {confidence:.0%} confidence "
+                    f"against a {required_confidence:.0%} requirement. {assessment.reason} "
                     f"Correlation adjustment {assessment.correlation_adjustment:.2f}."
                 ),
                 **base,
