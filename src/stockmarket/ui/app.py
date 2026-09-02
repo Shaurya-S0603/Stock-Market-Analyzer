@@ -5,6 +5,7 @@ import streamlit as st
 from ..services import TraderMode
 from .context import build_context
 from .onboarding import onboarding_complete, render_onboarding
+from .research_lab import research_lab_page
 from .sidebar import load_settings, render_sidebar_shell
 from .site_pages import (
     ai_trader_page,
@@ -79,6 +80,12 @@ def _build_navigation_pages(ctx):
                 title="Model Analytics",
                 icon=":material/model_training:",
                 url_path="model-analytics",
+            ),
+            st.Page(
+                lambda: research_lab_page(ctx),
+                title="Research Lab",
+                icon=":material/science:",
+                url_path="research-lab",
             ),
             st.Page(
                 lambda: backtesting_page(ctx),
