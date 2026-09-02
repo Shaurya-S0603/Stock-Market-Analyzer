@@ -11,8 +11,8 @@ class Settings:
     starting_cash: float = 100_000.0
     commission_rate: float = 0.001
     slippage_rate: float = 0.0005
-    buy_threshold: float = 0.005
-    sell_threshold: float = -0.005
+    buy_threshold: float = 0.003
+    sell_threshold: float = -0.004
 
     @classmethod
     def from_environment(cls) -> "Settings":
