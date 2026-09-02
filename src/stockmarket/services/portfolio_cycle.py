@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..benchmarks import assess_trading_evidence
 from .analysis import AnalysisRequest, AnalysisService, SymbolAnalysis, WatchlistAnalysis
 
 
@@ -12,6 +13,8 @@ class PortfolioSignalState:
     model_gate_passed: bool
     model_gate_reason: str
     target_weight: float
+    evidence_tier: str = "strong"
+    evidence_multiplier: float = 1.0
 
 
 @dataclass
@@ -53,17 +56,35 @@ class PortfolioCycleService:
             if analysis is None:
                 continue
             try:
-                _, gate = self.analysis_service.benchmark_report(analysis)
-                passed = bool(gate.approved)
-                reason = str(gate.reason)
+                rows, strict_gate = self.analysis_service.benchmark_report(analysis)
+                if rows:
+                    trading_gate = assess_trading_evidence(rows)
+                    passed = bool(trading_gate.approved)
+                    reason = (
+                        f"Trading evidence {trading_gate.tier}: {trading_gate.reason} "
+                        f"Strict research gate: {'PASS' if strict_gate.approved else 'HOLD'}."
+                    )
+                    evidence_tier = trading_gate.tier
+                    evidence_multiplier = float(trading_gate.size_multiplier)
+                else:
+                    # Compatibility path for lightweight/custom analysis services that
+                    # expose only a strict gate and no benchmark ladder.
+                    passed = bool(strict_gate.approved)
+                    reason = f"Strict evidence fallback: {strict_gate.reason}"
+                    evidence_tier = "strong" if passed else "weak"
+                    evidence_multiplier = 1.0 if passed else 0.0
             except ValueError as exc:
                 passed = False
                 reason = f"Benchmark gate unavailable: {exc}"
+                evidence_tier = "unavailable"
+                evidence_multiplier = 0.0
             states[symbol] = PortfolioSignalState(
                 symbol=symbol,
                 analysis=analysis,
                 model_gate_passed=passed,
                 model_gate_reason=reason,
                 target_weight=float(allocation_map.get(symbol.upper(), 0.0)),
+                evidence_tier=evidence_tier,
+                evidence_multiplier=evidence_multiplier,
             )
         return PortfolioResearchCycle(states=states, unavailable=dict(watchlist.unavailable))

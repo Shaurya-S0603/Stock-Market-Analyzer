@@ -51,9 +51,9 @@ def _risk_config(profile: str, mode: TraderMode, largest_allocation: float) -> A
             "volatility_target_pct": 1.0, "max_pairwise_correlation": 0.80, "correlation_penalty_floor": 0.25,
         },
         "Balanced": {
-            "min_confidence": 0.65, "max_position_pct": 10.0, "max_portfolio_exposure_pct": 60.0,
-            "max_open_positions": 6, "max_daily_trades": 12, "max_daily_loss_pct": 3.0,
-            "volatility_target_pct": 1.5, "max_pairwise_correlation": 0.90, "correlation_penalty_floor": 0.35,
+            "min_confidence": 0.58, "max_position_pct": 12.0, "max_portfolio_exposure_pct": 70.0,
+            "max_open_positions": 8, "max_daily_trades": 16, "max_daily_loss_pct": 3.0,
+            "volatility_target_pct": 1.75, "max_pairwise_correlation": 0.92, "correlation_penalty_floor": 0.40,
         },
         "Aggressive": {
             "min_confidence": 0.55, "max_position_pct": 15.0, "max_portfolio_exposure_pct": 75.0,

@@ -31,23 +31,29 @@ jobs:
           )
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Publish v1.0.0 tag and GitHub release once
-        if: steps.version.outputs.version == '1.0.0'
+      - name: Publish v1 tag and GitHub release once
+        if: startsWith(steps.version.outputs.version, '1.')
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
         shell: bash
         run: |
-          if gh release view v1.0.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "v1.0.0 release already exists; nothing to publish."
+          TAG="v${VERSION}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "$TAG release already exists; nothing to publish."
             exit 0
           fi
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if ! git rev-parse v1.0.0 >/dev/null 2>&1; then
-            git tag -a v1.0.0 -m "QuantEdge v1.0.0"
-            git push origin v1.0.0
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag -a "$TAG" -m "QuantEdge $TAG"
+            git push origin "$TAG"
           fi
-          gh release create v1.0.0 \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "QuantEdge v1.0.0" \
-            --notes-file RELEASE_NOTES_v1.0.md
+
+          NOTES_FILE="RELEASE_NOTES_${TAG}.md"
+          if [[ -f "$NOTES_FILE" ]]; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "QuantEdge $TAG" --notes-file "$NOTES_FILE"
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "QuantEdge $TAG" --generate-notes
+          fi

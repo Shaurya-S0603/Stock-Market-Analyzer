@@ -19,6 +19,25 @@ class ModelGate:
     directional_accuracy: float
 
 
+@dataclass(frozen=True)
+class TradingEvidenceGate:
+    """Execution-facing evidence gate with graded sizing for paper research.
+
+    The strict ModelGate remains the research/governance standard. This gate exists
+    so a borderline-but-positive model can participate at reduced simulated size
+    instead of turning the AI Trader into an all-or-nothing switch.
+    """
+
+    candidate: str
+    approved: bool
+    tier: str
+    reason: str
+    rmse_improvement_vs_best_baseline: float
+    directional_accuracy: float
+    strategy_return: float
+    size_multiplier: float
+
+
 def _core_frame(frame: pd.DataFrame) -> pd.DataFrame:
     return frame[[column for column in FEATURE_COLUMNS if column in frame.columns] + ["target_return"]]
 
@@ -144,6 +163,60 @@ def assess_model_gate(
     else:
         reason = f"RMSE improved by {improvement:.1%}, but mean directional accuracy of {directional_accuracy:.1%} is below the {minimum_directional_accuracy:.0%} gate."
     return ModelGate(candidate, approved, reason, improvement, directional_accuracy)
+
+
+def assess_trading_evidence(
+    benchmark_rows: list[dict[str, float | str]],
+    candidate: str = "ridge_momentum",
+    *,
+    strong_directional_accuracy: float = 0.50,
+    acceptable_directional_accuracy: float = 0.47,
+    acceptable_rmse_floor: float = -0.05,
+) -> TradingEvidenceGate:
+    """Grade evidence for simulated execution without disabling model governance.
+
+    Strong candidates receive full sizing. Candidates that are close to the best
+    simple baseline, directionally useful, and positive in the fold strategy metric
+    are allowed at reduced size. Materially weak candidates remain hard rejects.
+    """
+    by_name = {str(row["model"]): row for row in benchmark_rows}
+    if candidate not in by_name:
+        raise ValueError(f"Candidate {candidate} is missing from benchmark results")
+    baseline_names = [name for name in ("zero_return", "historical_mean", "momentum") if name in by_name]
+    if not baseline_names:
+        raise ValueError("At least one simple benchmark is required")
+
+    row = by_name[candidate]
+    candidate_rmse = float(row["rmse"])
+    best_baseline_rmse = min(float(by_name[name]["rmse"]) for name in baseline_names)
+    improvement = (best_baseline_rmse - candidate_rmse) / max(best_baseline_rmse, 1e-12)
+    directional_accuracy = float(row["directional_accuracy"])
+    strategy_return = float(row.get("strategy_return", 0.0))
+
+    if improvement > 0.0 and directional_accuracy >= strong_directional_accuracy:
+        return TradingEvidenceGate(
+            candidate, True, "strong",
+            f"Strong evidence: RMSE beat the best simple baseline by {improvement:.1%} with {directional_accuracy:.1%} directional accuracy.",
+            improvement, directional_accuracy, strategy_return, 1.0,
+        )
+
+    acceptable = (
+        improvement >= acceptable_rmse_floor
+        and directional_accuracy >= acceptable_directional_accuracy
+        and strategy_return > 0.0
+    )
+    if acceptable:
+        return TradingEvidenceGate(
+            candidate, True, "acceptable",
+            f"Acceptable paper-trading evidence: RMSE gap {improvement:.1%}, direction {directional_accuracy:.1%}, and positive fold strategy return. Entry size is reduced.",
+            improvement, directional_accuracy, strategy_return, 0.65,
+        )
+
+    return TradingEvidenceGate(
+        candidate, False, "weak",
+        f"Weak evidence: RMSE gap {improvement:.1%}, direction {directional_accuracy:.1%}, strategy metric {strategy_return:.4f}. No new paper entry.",
+        improvement, directional_accuracy, strategy_return, 0.0,
+    )
 
 
 def best_benchmark(benchmark_rows: list[dict[str, float | str]]) -> dict[str, float | str]:

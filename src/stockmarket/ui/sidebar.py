@@ -15,8 +15,8 @@ class UISettings:
     period: str = "60d"
     interval: str = "1h"
     horizon: int = 6
-    buy_threshold: float = 0.005
-    sell_threshold: float = -0.005
+    buy_threshold: float = 0.003
+    sell_threshold: float = -0.004
     starting_cash: float = 100_000.0
     commission_rate: float = 0.001
     slippage_rate: float = 0.0005
@@ -106,6 +106,7 @@ def render_settings_form(settings: UISettings) -> UISettings:
         help="Bars ahead represented by the prediction target. The default is 6 hourly bars, approximately one regular trading session.",
     )
     st.markdown("#### Signal thresholds")
+    st.caption("The default 0.30% buy edge is return-seeking but still sits on top of modeled round-trip costs.")
     signal = st.columns(2)
     buy_threshold = signal[0].slider("Buy threshold (%)", 0.1, 10.0, settings.buy_threshold * 100.0, 0.1) / 100.0
     sell_threshold = -(signal[1].slider("Sell threshold (%)", 0.1, 10.0, abs(settings.sell_threshold) * 100.0, 0.1) / 100.0)
