@@ -57,14 +57,22 @@ class PortfolioCycleService:
                 continue
             try:
                 rows, strict_gate = self.analysis_service.benchmark_report(analysis)
-                trading_gate = assess_trading_evidence(rows)
-                passed = bool(trading_gate.approved)
-                reason = (
-                    f"Trading evidence {trading_gate.tier}: {trading_gate.reason} "
-                    f"Strict research gate: {'PASS' if strict_gate.approved else 'HOLD'}."
-                )
-                evidence_tier = trading_gate.tier
-                evidence_multiplier = float(trading_gate.size_multiplier)
+                if rows:
+                    trading_gate = assess_trading_evidence(rows)
+                    passed = bool(trading_gate.approved)
+                    reason = (
+                        f"Trading evidence {trading_gate.tier}: {trading_gate.reason} "
+                        f"Strict research gate: {'PASS' if strict_gate.approved else 'HOLD'}."
+                    )
+                    evidence_tier = trading_gate.tier
+                    evidence_multiplier = float(trading_gate.size_multiplier)
+                else:
+                    # Compatibility path for lightweight/custom analysis services that
+                    # expose only a strict gate and no benchmark ladder.
+                    passed = bool(strict_gate.approved)
+                    reason = f"Strict evidence fallback: {strict_gate.reason}"
+                    evidence_tier = "strong" if passed else "weak"
+                    evidence_multiplier = 1.0 if passed else 0.0
             except ValueError as exc:
                 passed = False
                 reason = f"Benchmark gate unavailable: {exc}"
