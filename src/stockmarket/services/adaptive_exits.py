@@ -31,7 +31,7 @@ def evaluate_adaptive_exit(analysis, position, orders: list[dict], policy) -> Ad
     atr_pct = atr / mark * 100.0 if mark > 0 else 0.0
     stop_pct = max(float(policy.stop_loss_pct), atr_pct * float(policy.atr_stop_multiple))
     target_pct = max(float(policy.take_profit_pct), stop_pct * float(policy.reward_to_risk))
-    stop_price = position.average_cost * (1.0 - stop_pct / 100.0)
+    hard_stop = position.average_cost * (1.0 - stop_pct / 100.0)
     target_price = position.average_cost * (1.0 + target_pct / 100.0)
 
     lookback = max(int(policy.trailing_lookback_bars), 2)
@@ -44,13 +44,6 @@ def evaluate_adaptive_exit(analysis, position, orders: list[dict], policy) -> Ad
         manual_minimum_hold_bars=int(policy.manual_minimum_hold_bars),
         strategy_minimum_hold_bars=int(policy.strategy_minimum_hold_bars),
     )
-    # A trailing high formed before a manual allocation must not immediately
-    # liquidate the new position. During acquisition grace only the cost-based
-    # hard stop is active; after grace the trailing stop may tighten protection.
-    effective_stop = stop_price if lifecycle.protected else max(
-        stop_price,
-        trailing_stop if recent_high > position.average_cost else stop_price,
-    )
     probability = float(getattr(analysis, "probability_profitable", 0.5))
     research_exit = evaluate_research_exit(
         analysis,
@@ -60,9 +53,20 @@ def evaluate_adaptive_exit(analysis, position, orders: list[dict], policy) -> Ad
     )
     conviction = research_exit.conviction
 
-    # Capital protection is allowed to override the holding window. Model labels,
-    # confidence decay, take-profit, and time exits are not.
-    if mark <= effective_stop:
+    # The cost-based hard stop is the only exit allowed to override acquisition
+    # grace. A historical trailing high is contextual rather than an unconditional
+    # liquidation trigger because it may conflict with fresh, strongly bullish
+    # model and market evidence.
+    active_stop = hard_stop
+    if (
+        not lifecycle.protected
+        and recent_high > position.average_cost
+        and conviction.score <= -0.12
+        and conviction.negative_votes >= 2
+    ):
+        active_stop = max(hard_stop, trailing_stop)
+
+    if mark <= hard_stop:
         reason = "adaptive_stop"
         should_exit = True
     elif lifecycle.protected:
@@ -77,6 +81,8 @@ def evaluate_adaptive_exit(analysis, position, orders: list[dict], policy) -> Ad
         and conviction.negative_votes >= 2
     ):
         should_exit, reason = True, "confidence_decay_confirmed"
+    elif mark <= active_stop and active_stop > hard_stop:
+        should_exit, reason = True, "adaptive_trailing_stop"
     elif mark >= target_price:
         should_exit, reason = True, "adaptive_take_profit"
     elif (
@@ -92,7 +98,7 @@ def evaluate_adaptive_exit(analysis, position, orders: list[dict], policy) -> Ad
         analysis.symbol,
         should_exit,
         reason,
-        float(effective_stop),
+        float(active_stop),
         float(target_price),
         float(trailing_stop),
         lifecycle.bars_held,
