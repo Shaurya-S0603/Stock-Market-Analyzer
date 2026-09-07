@@ -21,15 +21,19 @@ RISK_PROFILES: dict[str, dict[str, float | int]] = {
         "max_daily_trades": 8,
         "max_daily_loss_pct": 2.0,
         "volatility_target_pct": 1.0,
+        "max_pairwise_correlation": 0.80,
+        "correlation_penalty_floor": 0.25,
     },
     "Balanced": {
-        "min_confidence": 0.65,
-        "max_position_pct": 10.0,
-        "max_portfolio_exposure_pct": 60.0,
-        "max_open_positions": 6,
-        "max_daily_trades": 12,
+        "min_confidence": 0.58,
+        "max_position_pct": 12.0,
+        "max_portfolio_exposure_pct": 70.0,
+        "max_open_positions": 8,
+        "max_daily_trades": 16,
         "max_daily_loss_pct": 3.0,
-        "volatility_target_pct": 1.5,
+        "volatility_target_pct": 1.75,
+        "max_pairwise_correlation": 0.92,
+        "correlation_penalty_floor": 0.40,
     },
     "Aggressive": {
         "min_confidence": 0.55,
@@ -39,6 +43,8 @@ RISK_PROFILES: dict[str, dict[str, float | int]] = {
         "max_daily_trades": 18,
         "max_daily_loss_pct": 5.0,
         "volatility_target_pct": 2.0,
+        "max_pairwise_correlation": 0.95,
+        "correlation_penalty_floor": 0.50,
     },
 }
 
@@ -88,6 +94,8 @@ def _risk_config(profile: str, mode: TraderMode, largest_allocation: float) -> A
             max_daily_trades=int(values["max_daily_trades"]),
             max_daily_loss_pct=float(values["max_daily_loss_pct"]),
             volatility_target_pct=float(values["volatility_target_pct"]),
+            max_pairwise_correlation=float(values["max_pairwise_correlation"]),
+            correlation_penalty_floor=float(values["correlation_penalty_floor"]),
         ),
     )
 
@@ -161,9 +169,9 @@ def render_onboarding() -> None:
     settings = load_settings()
     page_header(
         "Build your paper portfolio",
-        "Define the symbols the strategy may evaluate and the maximum share of paper equity each symbol may use. Allocations are capital ceilings, not automatic purchases.",
+        "Define the symbols the strategy may evaluate and the maximum share of paper equity each symbol may use. Allocations are capital ceilings, not automatic purchases or sell instructions.",
         eyebrow="PORTFOLIO ONBOARDING",
-        meta="Step 1 of v0.5 Portfolio Intelligence",
+        meta="v1.1 Research Intelligence",
     )
     callout(
         "Simulation boundary",
@@ -232,7 +240,7 @@ def render_onboarding() -> None:
     else:
         st.warning(message)
 
-    section_header("4 · Trading profile", "Choose how selective the simulator should be")
+    section_header("4 · Trading profile", "Choose how selective the paper simulator should be")
     profile_cols = st.columns(2)
     risk_profile = profile_cols[0].selectbox("Risk profile", list(RISK_PROFILES), index=1)
     mode_label = profile_cols[1].selectbox(
