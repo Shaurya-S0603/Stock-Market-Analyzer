@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
 
 import pandas as pd
+
+from .research_intelligence import evaluate_research_exit, position_lifecycle
 
 
 @dataclass(frozen=True)
@@ -16,31 +17,8 @@ class AdaptiveExitDecision:
     trailing_stop: float
     holding_bars: int | None
     probability_profitable: float
-
-
-def _latest_buy_time(symbol: str, orders: list[dict]) -> datetime | None:
-    candidates: list[datetime] = []
-    for order in orders:
-        if str(order.get("symbol", "")).upper() != symbol.upper() or str(order.get("side", "")).lower() != "buy":
-            continue
-        raw = str(order.get("created_at", "")).replace("Z", "+00:00")
-        try:
-            candidates.append(datetime.fromisoformat(raw))
-        except ValueError:
-            continue
-    return max(candidates) if candidates else None
-
-
-def _holding_bars(analysis, orders: list[dict]) -> int | None:
-    opened = _latest_buy_time(analysis.symbol, orders)
-    if opened is None or not isinstance(analysis.bars.index, pd.DatetimeIndex):
-        return None
-    index = pd.DatetimeIndex(analysis.bars.index)
-    if index.tz is not None and opened.tzinfo is None:
-        opened = opened.replace(tzinfo=index.tz)
-    elif index.tz is None and opened.tzinfo is not None:
-        opened = opened.replace(tzinfo=None)
-    return int((index >= opened).sum())
+    research_score: float = 0.0
+    protected: bool = False
 
 
 def evaluate_adaptive_exit(analysis, position, orders: list[dict], policy) -> AdaptiveExitDecision:
@@ -53,36 +31,78 @@ def evaluate_adaptive_exit(analysis, position, orders: list[dict], policy) -> Ad
     atr_pct = atr / mark * 100.0 if mark > 0 else 0.0
     stop_pct = max(float(policy.stop_loss_pct), atr_pct * float(policy.atr_stop_multiple))
     target_pct = max(float(policy.take_profit_pct), stop_pct * float(policy.reward_to_risk))
-    stop_price = position.average_cost * (1.0 - stop_pct / 100.0)
+    hard_stop = position.average_cost * (1.0 - stop_pct / 100.0)
     target_price = position.average_cost * (1.0 + target_pct / 100.0)
 
     lookback = max(int(policy.trailing_lookback_bars), 2)
     recent_high = float(pd.to_numeric(analysis.bars["High"], errors="coerce").tail(lookback).max())
     trailing_stop = recent_high * (1.0 - stop_pct / 100.0)
-    effective_stop = max(stop_price, trailing_stop if recent_high > position.average_cost else stop_price)
-    probability = float(getattr(analysis, "probability_profitable", 0.5))
-    bars_held = _holding_bars(analysis, orders)
 
-    reason = "hold"
-    should_exit = False
-    if str(analysis.signal.action) == "Sell":
-        should_exit, reason = True, "signal_reversal"
-    elif probability < float(policy.min_hold_probability):
-        should_exit, reason = True, "confidence_decay"
-    elif mark <= effective_stop:
-        should_exit, reason = True, "adaptive_stop"
+    lifecycle = position_lifecycle(
+        analysis,
+        orders,
+        manual_minimum_hold_bars=int(policy.manual_minimum_hold_bars),
+        strategy_minimum_hold_bars=int(policy.strategy_minimum_hold_bars),
+    )
+    probability = float(getattr(analysis, "probability_profitable", 0.5))
+    research_exit = evaluate_research_exit(
+        analysis,
+        orders,
+        manual_minimum_hold_bars=int(policy.manual_minimum_hold_bars),
+        strategy_minimum_hold_bars=int(policy.strategy_minimum_hold_bars),
+    )
+    conviction = research_exit.conviction
+
+    # The cost-based hard stop is the only exit allowed to override acquisition
+    # grace. A historical trailing high is contextual rather than an unconditional
+    # liquidation trigger because it may conflict with fresh, strongly bullish
+    # model and market evidence.
+    active_stop = hard_stop
+    if (
+        not lifecycle.protected
+        and recent_high > position.average_cost
+        and conviction.score <= -0.12
+        and conviction.negative_votes >= 2
+    ):
+        active_stop = max(hard_stop, trailing_stop)
+
+    if mark <= hard_stop:
+        reason = "adaptive_stop"
+        should_exit = True
+    elif lifecycle.protected:
+        reason = "acquisition_grace"
+        should_exit = False
+    elif str(analysis.signal.action) == "Sell":
+        should_exit = bool(research_exit.should_exit)
+        reason = "research_bearish_reversal" if should_exit else "sell_not_confirmed"
+    elif (
+        probability < float(policy.min_hold_probability)
+        and conviction.score <= -0.12
+        and conviction.negative_votes >= 2
+    ):
+        should_exit, reason = True, "confidence_decay_confirmed"
+    elif mark <= active_stop and active_stop > hard_stop:
+        should_exit, reason = True, "adaptive_trailing_stop"
     elif mark >= target_price:
         should_exit, reason = True, "adaptive_take_profit"
-    elif bars_held is not None and bars_held >= int(policy.max_holding_bars):
+    elif (
+        lifecycle.bars_held is not None
+        and lifecycle.bars_held >= int(policy.max_holding_bars)
+        and conviction.score <= 0.0
+    ):
         should_exit, reason = True, "time_stop"
+    else:
+        should_exit, reason = False, "hold"
 
     return AdaptiveExitDecision(
         analysis.symbol,
         should_exit,
         reason,
-        float(effective_stop),
+        float(active_stop),
         float(target_price),
         float(trailing_stop),
-        bars_held,
+        lifecycle.bars_held,
         probability,
+        float(conviction.score),
+        bool(lifecycle.protected),
     )

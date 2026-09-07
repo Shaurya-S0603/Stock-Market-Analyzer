@@ -10,6 +10,7 @@ from .ai_trader import AITraderConfig
 from .correlation import build_return_correlation_matrix, candidate_portfolio_correlation
 from .opportunity import RankedOpportunity
 from .portfolio_cycle import PortfolioResearchCycle
+from .research_intelligence import research_entry_adjustment
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,10 @@ class OptimizedOpportunity:
     reason: str
     max_correlation: float = 0.0
     correlation_adjustment: float = 1.0
+    research_score: float = 0.0
+    research_adjustment: float = 1.0
+    research_positive_votes: int = 0
+    research_negative_votes: int = 0
 
 
 def _latest_context(analysis) -> dict:
@@ -61,7 +66,7 @@ class PortfolioOptimizer:
         cycle_budget_pct = max(min(cash_pct, exposure_room_pct), 0.0)
         correlation_matrix = build_return_correlation_matrix(cycle)
 
-        prepared: list[tuple[RankedOpportunity, float, float, float, float, float, float]] = []
+        prepared: list[tuple[RankedOpportunity, float, float, float, float, float, float, float, object]] = []
         for item in ranked:
             if not item.eligible or item.symbol not in cycle.states:
                 continue
@@ -88,25 +93,46 @@ class PortfolioOptimizer:
                     1.0 - scaled * (1.0 - config.risk_limits.correlation_penalty_floor),
                 )
 
-            # Return-seeking score: expected cost-adjusted edge remains primary, while
-            # volatility acts as a square-root penalty rather than fully dividing the
-            # signal away. Borderline evidence is allowed only with reduced sizing.
             evidence_multiplier = float(getattr(state, "evidence_multiplier", 1.0))
+            research_adjustment, conviction = research_entry_adjustment(state.analysis)
             risk_adjusted_edge = edge * max(confidence, 0.01) / np.sqrt(max(volatility_pct, 0.05))
             regime_penalty = 0.90 if float(latest.get("regime_high_volatility", 0.0) or 0.0) >= 0.5 else 1.0
-            score = max(risk_adjusted_edge * regime_penalty * correlation_adjustment * evidence_multiplier, 1e-12)
-            prepared.append((item, score, sleeve_capacity, current_weight, volatility_pct, max_correlation, correlation_adjustment))
+            score = max(
+                risk_adjusted_edge
+                * regime_penalty
+                * correlation_adjustment
+                * evidence_multiplier
+                * research_adjustment,
+                1e-12,
+            )
+            prepared.append(
+                (
+                    item,
+                    score,
+                    sleeve_capacity,
+                    current_weight,
+                    volatility_pct,
+                    max_correlation,
+                    correlation_adjustment,
+                    research_adjustment,
+                    conviction,
+                )
+            )
 
-        total_score = sum(row[1] for row in prepared)
+        total_score = sum(row[1] for row in prepared if row[7] > 0)
         optimized: list[OptimizedOpportunity] = []
-        for item, score, sleeve_capacity, current_weight, volatility_pct, max_correlation, correlation_adjustment in prepared:
+        for item, score, sleeve_capacity, current_weight, volatility_pct, max_correlation, correlation_adjustment, research_adjustment, conviction in prepared:
             state = cycle.states[item.symbol]
-            proportional_budget = cycle_budget_pct * score / total_score if total_score > 0 else 0.0
+            proportional_budget = cycle_budget_pct * score / total_score if total_score > 0 and research_adjustment > 0 else 0.0
             evidence_multiplier = float(getattr(state, "evidence_multiplier", 1.0))
             per_entry_cap = min(float(config.allocation_pct), float(config.risk_limits.max_position_pct), sleeve_capacity)
             per_entry_cap *= max(min(evidence_multiplier, 1.0), 0.0)
+            # Positive conviction improves ranking and share of the cycle budget,
+            # but never raises the user's configured per-entry ceiling. Negative
+            # conviction may still haircut that ceiling or block the entry.
+            per_entry_cap *= max(min(float(research_adjustment), 1.0), 0.0)
             target_entry_pct = min(proportional_budget, per_entry_cap)
-            if max_correlation > config.risk_limits.max_pairwise_correlation:
+            if max_correlation > config.risk_limits.max_pairwise_correlation or research_adjustment <= 0:
                 target_entry_pct = 0.0
             optimized.append(
                 OptimizedOpportunity(
@@ -120,11 +146,17 @@ class PortfolioOptimizer:
                     volatility_pct=float(volatility_pct),
                     reason=(
                         f"Return-seeking edge score {score:.6f}; evidence {getattr(state, 'evidence_tier', 'strong')} "
-                        f"({evidence_multiplier:.2f}x size); sleeve room {sleeve_capacity:.2f}%; "
-                        f"cycle budget {cycle_budget_pct:.2f}%; max portfolio correlation {max_correlation:.2f}."
+                        f"({evidence_multiplier:.2f}x); research {conviction.score:+.2f} "
+                        f"({research_adjustment:.2f}x, +{conviction.positive_votes}/-{conviction.negative_votes} votes); "
+                        f"sleeve room {sleeve_capacity:.2f}%; cycle budget {cycle_budget_pct:.2f}%; "
+                        f"max portfolio correlation {max_correlation:.2f}."
                     ),
                     max_correlation=float(max_correlation),
                     correlation_adjustment=float(correlation_adjustment),
+                    research_score=float(conviction.score),
+                    research_adjustment=float(research_adjustment),
+                    research_positive_votes=int(conviction.positive_votes),
+                    research_negative_votes=int(conviction.negative_votes),
                 )
             )
         optimized.sort(key=lambda row: (row.target_entry_pct > 0, row.score, row.symbol), reverse=True)

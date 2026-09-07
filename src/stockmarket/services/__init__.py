@@ -17,6 +17,15 @@ from .portfolio_backtest import PortfolioFoldResult, PortfolioWalkForwardReport,
 from .portfolio_cycle import PortfolioCycleService, PortfolioResearchCycle, PortfolioSignalState
 from .portfolio_optimizer import OptimizedOpportunity, PortfolioOptimizer
 from .rebalancing import PaperRebalancePlan, RebalanceInstruction, build_rebalance_plan
+from .research_intelligence import (
+    PositionLifecycle,
+    ResearchConviction,
+    ResearchExitDecision,
+    compute_research_conviction,
+    evaluate_research_exit,
+    position_lifecycle,
+    research_entry_adjustment,
+)
 from .risk import RiskAssessment, RiskEngine, RiskLimits
 from .symbol_stats import SymbolStrategyStats, build_symbol_strategy_stats
 
@@ -32,5 +41,6 @@ __all__ = [
     "run_portfolio_walk_forward", "PaperOnlyPortfolioStrategy", "PaperStrategyCycleResult", "PortfolioCycleService",
     "PortfolioResearchCycle", "PortfolioSignalState", "PersistentPaperState", "PortfolioService", "RiskPolicy",
     "RiskAssessment", "RiskEngine", "RiskLimits", "SymbolAnalysis", "WatchlistAnalysis", "JournalService",
-    "TraderCycleSummary",
+    "TraderCycleSummary", "ResearchConviction", "PositionLifecycle", "ResearchExitDecision",
+    "compute_research_conviction", "evaluate_research_exit", "position_lifecycle", "research_entry_adjustment",
 ]

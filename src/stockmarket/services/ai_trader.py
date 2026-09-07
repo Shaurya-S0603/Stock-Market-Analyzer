@@ -6,6 +6,7 @@ from enum import StrEnum
 from ..trading import PaperPortfolio
 from .analysis import SymbolAnalysis
 from .portfolio import PortfolioService
+from .research_intelligence import evaluate_research_exit
 from .risk import RiskEngine, RiskLimits
 
 
@@ -110,6 +111,7 @@ class AITraderService:
         confidence = float(analysis.signal.confidence)
         position = portfolio.positions.get(symbol)
         position_qty = position.quantity if position else 0
+        order_history = orders or []
 
         base = dict(
             symbol=symbol,
@@ -127,14 +129,32 @@ class AITraderService:
         if signal == "Hold":
             return TradeDecision(decision="HOLD", quantity=0, reason="Current signal does not cross an entry or exit threshold.", **base)
 
-        # Entry evidence gates should never trap an already-open paper position.
+        # An entry gate must not trap an open position, but neither should one noisy
+        # Sell label liquidate it. Research exits require lifecycle-aware bearish
+        # confirmation. Hard stops are handled independently by the risk policy.
         if signal == "Sell":
             if position_qty <= 0:
                 return TradeDecision(decision="REJECT", quantity=0, reason="Sell signal ignored because no long paper position is open.", **base)
+            exit_decision = evaluate_research_exit(analysis, order_history)
+            if not exit_decision.should_exit:
+                lifecycle = exit_decision.lifecycle
+                bars = "unknown" if lifecycle.bars_held is None else str(lifecycle.bars_held)
+                return TradeDecision(
+                    decision="HOLD",
+                    quantity=0,
+                    reason=(
+                        f"Sell label not confirmed by research intelligence; position retained. "
+                        f"Bars held {bars}/{lifecycle.minimum_hold_bars}; {exit_decision.conviction.summary}."
+                    ),
+                    **base,
+                )
             return TradeDecision(
                 decision="SELL",
                 quantity=position_qty,
-                reason="Existing paper position exit approved; entry-only model/confidence gates do not block exits.",
+                reason=(
+                    f"Multi-factor bearish exit confirmed after lifecycle checks; "
+                    f"{exit_decision.conviction.summary}."
+                ),
                 **base,
             )
 
@@ -169,7 +189,7 @@ class AITraderService:
                 volatility,
                 portfolio,
                 prices or {symbol: float(analysis.price)},
-                orders or [],
+                order_history,
                 config.allocation_pct,
                 config.risk_limits,
                 correlation_to_portfolio=correlation_to_portfolio,

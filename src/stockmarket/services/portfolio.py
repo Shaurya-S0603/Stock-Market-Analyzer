@@ -19,6 +19,8 @@ class RiskPolicy:
     trailing_lookback_bars: int = 30
     min_hold_probability: float = 0.38
     max_holding_bars: int = 60
+    manual_minimum_hold_bars: int = 12
+    strategy_minimum_hold_bars: int = 3
 
     def validate(self) -> None:
         if self.stop_loss_pct <= 0 or self.take_profit_pct <= 0:
@@ -27,6 +29,8 @@ class RiskPolicy:
             raise ValueError("Adaptive exit multipliers must be positive")
         if self.trailing_lookback_bars < 2 or self.max_holding_bars < 1:
             raise ValueError("Adaptive exit lookback and holding limits must be positive")
+        if self.manual_minimum_hold_bars < 0 or self.strategy_minimum_hold_bars < 0:
+            raise ValueError("Minimum holding bars must be non-negative")
         if not 0.0 <= self.min_hold_probability <= 1.0:
             raise ValueError("min_hold_probability must be between 0 and 1")
 
@@ -103,7 +107,7 @@ class PortfolioService:
             detail = (
                 f"Adaptive paper exit {symbol}: {decision.reason.replace('_', ' ')} at ${fill.price:,.2f}; "
                 f"stop ${decision.stop_price:,.2f}, target ${decision.target_price:,.2f}, "
-                f"profitable probability {decision.probability_profitable:.0%}."
+                f"profitable probability {decision.probability_profitable:.0%}, research score {decision.research_score:+.2f}."
             )
             self.store.add_risk_event(decision.reason, detail, symbol)
             events.append(detail)

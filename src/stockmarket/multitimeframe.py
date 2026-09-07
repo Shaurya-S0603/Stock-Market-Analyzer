@@ -8,11 +8,14 @@ from .regime import REGIME_FEATURE_COLUMNS, add_regime_features
 DAILY_CONTEXT_COLUMNS = [
     "daily_return_1",
     "daily_return_5",
+    "daily_return_20",
+    "daily_return_60",
     "daily_volatility_20",
     "daily_trend_20",
     "daily_trend_50",
     "daily_atr_pct",
     "daily_volume_ratio_20",
+    "daily_price_volume_confirmation",
 ]
 
 
@@ -45,11 +48,21 @@ def build_daily_context(daily_bars: pd.DataFrame) -> pd.DataFrame:
     context = pd.DataFrame(index=frame.index)
     context["daily_return_1"] = close.pct_change()
     context["daily_return_5"] = close.pct_change(5)
+    context["daily_return_20"] = close.pct_change(20)
+    return_60 = close.pct_change(60)
+    # Before sixty completed sessions exist, fall back to the already-completed
+    # 20-session momentum measure. Once available, the true 60-session feature
+    # takes over. Both paths use only historical closes and remain causal.
+    context["daily_return_60"] = return_60.where(return_60.notna(), context["daily_return_20"])
     context["daily_volatility_20"] = close.pct_change().rolling(20, min_periods=10).std()
     context["daily_trend_20"] = close / close.rolling(20, min_periods=10).mean() - 1.0
     context["daily_trend_50"] = close / close.rolling(50, min_periods=25).mean() - 1.0
     context["daily_atr_pct"] = true_range.rolling(14, min_periods=7).mean() / close
     context["daily_volume_ratio_20"] = volume / volume.rolling(20, min_periods=10).mean()
+    context["daily_price_volume_confirmation"] = (
+        np.sign(context["daily_return_5"])
+        * np.clip(context["daily_volume_ratio_20"] - 1.0, -2.0, 2.0)
+    )
     context = context.replace([np.inf, -np.inf], np.nan)
 
     # Critical leakage guard: the row labelled date D is shifted so it contains
