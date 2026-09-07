@@ -49,11 +49,11 @@ def build_daily_context(daily_bars: pd.DataFrame) -> pd.DataFrame:
     context["daily_return_1"] = close.pct_change()
     context["daily_return_5"] = close.pct_change(5)
     context["daily_return_20"] = close.pct_change(20)
-    # Sixty sessions gives the model a medium-horizon momentum view. Use a
-    # 40-session fallback only for shorter synthetic/test histories so the
-    # feature remains defined without contaminating production semantics.
-    lookback_60 = 60 if len(frame) > 60 else max(min(len(frame) - 1, 40), 1)
-    context["daily_return_60"] = close.pct_change(lookback_60)
+    return_60 = close.pct_change(60)
+    # Before sixty completed sessions exist, fall back to the already-completed
+    # 20-session momentum measure. Once available, the true 60-session feature
+    # takes over. Both paths use only historical closes and remain causal.
+    context["daily_return_60"] = return_60.where(return_60.notna(), context["daily_return_20"])
     context["daily_volatility_20"] = close.pct_change().rolling(20, min_periods=10).std()
     context["daily_trend_20"] = close / close.rolling(20, min_periods=10).mean() - 1.0
     context["daily_trend_50"] = close / close.rolling(50, min_periods=25).mean() - 1.0
