@@ -6,11 +6,15 @@ import pandas as pd
 TACTICAL_CONTEXT_COLUMNS = [
     "context_return_1",
     "context_return_6",
+    "context_return_24",
     "context_volatility_20",
     "context_volume_ratio_20",
+    "context_volume_shock_6_20",
+    "context_price_volume_confirmation",
     "context_range_pct",
     "context_gap_pct",
     "context_trend_persistence",
+    "context_trend_persistence_24",
     "context_hour_sin",
     "context_hour_cos",
     "context_benchmark_return_6",
@@ -30,14 +34,24 @@ def build_tactical_context(bars: pd.DataFrame, benchmark_bars: pd.DataFrame | No
     close = pd.to_numeric(frame["Close"], errors="coerce")
     volume = pd.to_numeric(frame["Volume"], errors="coerce")
     returns = close.pct_change()
+    volume_mean_6 = volume.rolling(6, min_periods=4).mean()
+    volume_mean_20 = volume.rolling(20, min_periods=10).mean()
+
     context = pd.DataFrame(index=frame.index)
     context["context_return_1"] = returns
     context["context_return_6"] = close.pct_change(6)
+    context["context_return_24"] = close.pct_change(24)
     context["context_volatility_20"] = returns.rolling(20, min_periods=10).std()
-    context["context_volume_ratio_20"] = volume / volume.rolling(20, min_periods=10).mean()
+    context["context_volume_ratio_20"] = volume / volume_mean_20
+    context["context_volume_shock_6_20"] = volume_mean_6 / volume_mean_20 - 1.0
+    context["context_price_volume_confirmation"] = (
+        np.sign(context["context_return_6"])
+        * np.clip(context["context_volume_ratio_20"] - 1.0, -2.0, 2.0)
+    )
     context["context_range_pct"] = (frame["High"] - frame["Low"]) / close
     context["context_gap_pct"] = frame["Open"] / close.shift(1) - 1.0
     context["context_trend_persistence"] = np.sign(returns).rolling(6, min_periods=4).mean()
+    context["context_trend_persistence_24"] = np.sign(returns).rolling(24, min_periods=12).mean()
 
     hours = pd.DatetimeIndex(frame.index).hour.to_numpy(dtype=float)
     radians = 2.0 * np.pi * hours / 24.0
