@@ -127,7 +127,10 @@ class PortfolioOptimizer:
             evidence_multiplier = float(getattr(state, "evidence_multiplier", 1.0))
             per_entry_cap = min(float(config.allocation_pct), float(config.risk_limits.max_position_pct), sleeve_capacity)
             per_entry_cap *= max(min(evidence_multiplier, 1.0), 0.0)
-            per_entry_cap *= max(min(float(research_adjustment), 1.25), 0.0)
+            # Positive conviction improves ranking and share of the cycle budget,
+            # but never raises the user's configured per-entry ceiling. Negative
+            # conviction may still haircut that ceiling or block the entry.
+            per_entry_cap *= max(min(float(research_adjustment), 1.0), 0.0)
             target_entry_pct = min(proportional_budget, per_entry_cap)
             if max_correlation > config.risk_limits.max_pairwise_correlation or research_adjustment <= 0:
                 target_entry_pct = 0.0
