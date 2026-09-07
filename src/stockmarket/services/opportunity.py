@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from .ai_trader import required_entry_confidence
 from .portfolio_cycle import PortfolioResearchCycle
+from .research_intelligence import research_entry_adjustment
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,10 @@ class RankedOpportunity:
     reason: str
     required_confidence: float = 0.58
     evidence_tier: str = "strong"
+    research_score: float = 0.0
+    research_adjustment: float = 1.0
+    research_positive_votes: int = 0
+    research_negative_votes: int = 0
 
 
 class OpportunityRanker:
@@ -38,6 +43,7 @@ class OpportunityRanker:
             net_edge = float(analysis.signal.net_edge)
             entry_threshold = float(getattr(analysis, "adaptive_buy_threshold", 0.003))
             required_confidence = required_entry_confidence(min_confidence, net_edge, entry_threshold)
+            research_adjustment, conviction = research_entry_adjustment(analysis)
             reasons: list[str] = []
             if signal != "Buy":
                 reasons.append(f"Signal is {signal}, not Buy.")
@@ -49,15 +55,19 @@ class OpportunityRanker:
                 reasons.append("Cost-adjusted net edge is not positive.")
             if state.target_weight <= 0:
                 reasons.append("No enabled portfolio allocation.")
+            if research_adjustment <= 0:
+                reasons.append("Multi-factor research conviction strongly contradicts the entry.")
             eligible = not reasons
             reason = (
-                f"Eligible simulated entry candidate with {state.evidence_tier} evidence."
+                f"Eligible simulated entry with {state.evidence_tier} model evidence; {conviction.summary}."
                 if eligible
-                else " ".join(reasons)
+                else " ".join(reasons + [conviction.summary])
             )
+            adjusted_edge = net_edge * research_adjustment if eligible else float("-inf")
             sort_key = (
                 int(eligible),
-                net_edge if eligible else float("-inf"),
+                adjusted_edge,
+                conviction.score if eligible else -1.0,
                 confidence if eligible else 0.0,
                 predicted_return if eligible else float("-inf"),
                 symbol,
@@ -74,6 +84,10 @@ class OpportunityRanker:
                 "reason": reason,
                 "required_confidence": float(required_confidence),
                 "evidence_tier": str(state.evidence_tier),
+                "research_score": float(conviction.score),
+                "research_adjustment": float(research_adjustment),
+                "research_positive_votes": int(conviction.positive_votes),
+                "research_negative_votes": int(conviction.negative_votes),
             }))
 
         prepared.sort(key=lambda item: item[0], reverse=True)
