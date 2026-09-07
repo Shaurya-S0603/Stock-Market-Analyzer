@@ -199,5 +199,9 @@ def ranked_opportunities_frame() -> pd.DataFrame:
         "model_gate_passed": "Model Gate",
         "evidence_tier": "Evidence Tier",
         "target_weight": "Target Weight",
+        "research_score": "Research Score",
+        "research_adjustment": "Research Size Multiplier",
+        "research_positive_votes": "Positive Votes",
+        "research_negative_votes": "Negative Votes",
         "reason": "Reason",
     })
