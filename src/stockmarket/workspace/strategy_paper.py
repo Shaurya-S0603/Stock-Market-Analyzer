@@ -284,7 +284,7 @@ class PaperStrategyRepository:
                     high_since_entry=high, entry_bar=entry_bar, realized_pnl=realized,
                     last_processed=_stamp(completed.index[-1]),
                     last_bar_hash=_bar_hash(last), last_close=float(last["close"]),
-                    updated_at=utc_now())))
+                    updated_at=utc_now()))
                 conn.commit()
                 return {"status":"executed","bars":processed,"fills":count}
             except Exception:
