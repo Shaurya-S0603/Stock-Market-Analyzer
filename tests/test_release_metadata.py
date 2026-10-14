@@ -11,7 +11,7 @@ def test_release_versions_are_synchronized() -> None:
     with Path("pyproject.toml").open("rb") as handle:
         project = tomllib.load(handle)["project"]
     assert project["version"] == "2.0.0"
-    assert stockmarket.__version__ == "1.1.0"
+    assert stockmarket.__version__ == "2.0.0"
 
 
 def test_all_release_assets_exist() -> None:
