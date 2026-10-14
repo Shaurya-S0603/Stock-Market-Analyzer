@@ -37,7 +37,7 @@ def test_fill_occurs_next_open_not_signal_close():
     result = run_backtest(frame, strategy(), starting_cash=1000)
     filled = [row for row in result["orders"] if row["status"] == "filled" and row["side"] == "buy"]
     assert filled
-    assert filled[0]["timestamp"] == frame.index[4].isoformat()
+    assert filled[0]["timestamp"] == frame.index[3].isoformat()
     assert filled[0]["price"] == 12
     assert result["metrics"]["open_shares"] > 0
 
@@ -78,7 +78,8 @@ def test_stop_first_when_both_stop_and_target_touched():
 def test_gap_through_stop_uses_open_price():
     frame = bars([100]*8)
     frame.loc[frame.index[3], ["high","close"]] = [103,102]
-    frame.loc[frame.index[4], ["open","high","low","close"]] = [80,90,75,82]
+    # Entry fills on day 5 at 100; the adverse opening gap arrives on day 6.
+    frame.loc[frame.index[5], ["open","high","low","close"]] = [80,90,75,82]
     conf = strategy(entry=[{"type":"price_above_sma", "period":2}],
                     risk={"stop_loss_pct":5, "take_profit_pct":10})
     result = run_backtest(frame, conf, starting_cash=10000)
