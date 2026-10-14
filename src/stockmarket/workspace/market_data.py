@@ -121,10 +121,40 @@ class HistoryResult:
     warning: str = ""
 
 
+
+
+@dataclass(frozen=True)
+class HistoricalQuote:
+    """A cached historical close, explicitly NOT a live market quotation."""
+    symbol: str
+    price: float
+    change: float | None
+    change_pct: float | None
+    observed_at: str
+    provider: str
+    origin: str = "saved historical close"
+
+
 class MarketDataService:
     def __init__(self, storage: WorkspaceDB, provider: YahooMarketAdapter | None = None):
         self.storage = storage
         self.provider = provider or YahooMarketAdapter()
+
+
+    def saved_quote(self, symbol: str) -> HistoricalQuote:
+        clean = clean_symbol(symbol)
+        candles = self.storage.load_candles(clean, "1d")
+        if candles.empty:
+            raise MarketDataError("No saved historical daily quote for " + clean)
+        last = float(candles["close"].iloc[-1])
+        previous = float(candles["close"].iloc[-2]) if len(candles) > 1 else None
+        change = last - previous if previous is not None else None
+        change_pct = change / previous * 100 if previous else None
+        return HistoricalQuote(
+            symbol=clean, price=last, change=change, change_pct=change_pct,
+            observed_at=candles.index[-1].isoformat(),
+            provider=str(candles["provider"].iloc[-1]),
+        )
 
     def history(self, symbol: str, *, period: str = "6mo", interval: str = "1d",
                 refresh: bool = False, offline: bool = False) -> HistoryResult:
