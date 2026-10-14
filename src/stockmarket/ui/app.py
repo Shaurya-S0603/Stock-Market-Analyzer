@@ -121,7 +121,24 @@ def _build_navigation_pages(ctx):
 def render_app() -> None:
     apply_theme()
     if not onboarding_complete():
-        render_onboarding()
+        # Research is usable before creating any paper portfolio.
+        # Paper onboarding remains explicitly available as a separate page.
+        navigation = st.navigation({
+            "Research": [
+                st.Page(
+                    market_explorer_page, title="Market Explorer",
+                    icon=":material/monitoring:", default=True,
+                ),
+            ],
+            "Simulation": [
+                st.Page(
+                    render_onboarding, title="Set up paper portfolio",
+                    icon=":material/account_balance_wallet:",
+                    url_path="paper-onboarding",
+                ),
+            ],
+        }, position="sidebar", expanded=True)
+        navigation.run()
         return
 
     settings = load_settings()
