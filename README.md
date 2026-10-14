@@ -1,4 +1,4 @@
-# QuantEdge Stock Market Analyzer v1.0
+# QuantEdge 2.0 | Free Local-First Streamlit Stock Research
 
 QuantEdge is a professional Streamlit quantitative-research and **paper-trading** workstation with dual-timeframe forecasting, portfolio-aware capital allocation, leakage-safe validation, calibrated model evidence, multi-symbol risk controls, strategy stress testing, and persistent simulated execution.
 
@@ -215,3 +215,10 @@ To explicitly request new best-effort historical bars from the free provider bef
     python workspace_worker.py --refresh
 
 The worker is not a guaranteed live feed or always-on hosted service. Durable historical simulated state requires durable local SQLite storage, and Cloud's local filesystem is ephemeral. Details: [Phase 4 monitoring and simulation](docs/PHASE_4_MONITORING.md).
+
+
+## Phase 5: Data portability, recovery and full automated verification
+
+The Data Management page exposes SQLite integrity checks, private multi-database backups (including the older AI paper state where present), SHA256 verification and safe, non-overwriting staged recovery. Historical OHLCV CSV import/export validates UTC offsets, prices, source provenance and historical revisions. Recovery never activates a new database until the app/worker is stopped and its environment paths are explicitly changed.
+
+The CI matrix now records JUnit test output and machine-readable feature coverage grouped into twelve core areas. These test artifacts certify the executed offline tests on an exact commit, **not** an unaudited live Streamlit Cloud URL, external market-feed accuracy, or 24/7 uptime. See docs/PHASE_5_OPERATIONS.md and RELEASE_NOTES_v2.0.0.md.

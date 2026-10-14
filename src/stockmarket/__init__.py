@@ -1,3 +1,3 @@
 """QuantEdge stock research and paper-trading toolkit."""
 
-__version__ = "1.1.0"
+__version__ = "2.0.0"
