@@ -187,3 +187,14 @@ New **Market Explorer** navigation supports persistent named watchlists, explici
 Market data is historical/cached, **not guaranteed real-time**, and provider coverage depends on free Yahoo availability. Use the Refresh action for downloads; other reruns do not silently query the provider. A fetch error with a prior saved dataset uses a clearly labeled cached fallback. Local SQLite works across restarts; cloud-local storage is ephemeral.
 
 Detailed roadmap and the Phase 0/1 technical audit: [docs/QUANTEDGE_V2_MASTER_PLAN.md](docs/QUANTEDGE_V2_MASTER_PLAN.md).
+
+
+## QuantEdge 2.0 Phase 3: Rule-Based Strategy Laboratory
+
+Build indicator-based rules in Streamlit's **Strategy Builder**, save strictly validated JSON definitions with immutable version history, and run **Strategy Backtests** on local historical candles. All fills are simulated on the next eligible bar's open after the signal's completed bar. No brokerage connectivity is added.
+
+The simulator tracks cash, positions, fees, slippage, rejected fills, conservative stop-first intrabar exits, open-position mark-to-market, drawdown, closed-trade history, and a clearly labeled buy-and-hold reference. Results are persisted as independently reopenable SQLite snapshots; **Backtest Comparison** warns when periods, assets, or methodology differ.
+
+To begin, run `streamlit run app.py`, obtain candles in **Market Explorer** or **Charts**, and use the new Strategy Builder. The legacy AI/backtest and paper-portfolio services remain separate.
+
+See [Phase 3 methodology](docs/PHASE_3_STRATEGIES_BACKTESTS.md) for exact assumptions and limitations.
