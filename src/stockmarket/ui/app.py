@@ -19,6 +19,7 @@ from .site_pages import (
     trade_journal_page,
 )
 from ..workspace.ui import market_explorer_page
+from ..workspace.pages import chart_terminal_page, stock_research_page, screener_page
 from .theme import apply_theme
 from .trader import load_trader_config, run_auto_trader_tick
 
@@ -57,6 +58,12 @@ def _build_navigation_pages(ctx):
                 url_path="market-explorer",
             ),
             st.Page(
+                chart_terminal_page,
+                title="Charts",
+                icon=":material/show_chart:",
+                url_path="charts",
+            ),
+            st.Page(
                 lambda: markets_page(ctx),
                 title="Markets",
                 icon=":material/candlestick_chart:",
@@ -82,6 +89,18 @@ def _build_navigation_pages(ctx):
             ),
         ],
         "Research": [
+            st.Page(
+                stock_research_page,
+                title="Stock Research",
+                icon=":material/article:",
+                url_path="stock-research",
+            ),
+            st.Page(
+                screener_page,
+                title="Stock Screener",
+                icon=":material/filter_alt:",
+                url_path="stock-screener",
+            ),
             st.Page(
                 lambda: model_analytics_page(ctx),
                 title="Model Analytics",
@@ -129,6 +148,9 @@ def render_app() -> None:
                     market_explorer_page, title="Market Explorer",
                     icon=":material/monitoring:", default=True,
                 ),
+                st.Page(chart_terminal_page, title="Charts", icon=":material/show_chart:", url_path="charts"),
+                st.Page(stock_research_page, title="Stock Research", icon=":material/article:", url_path="stock-research"),
+                st.Page(screener_page, title="Stock Screener", icon=":material/filter_alt:", url_path="stock-screener"),
             ],
             "Simulation": [
                 st.Page(
