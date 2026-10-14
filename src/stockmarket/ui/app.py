@@ -21,6 +21,7 @@ from .site_pages import (
 from ..workspace.ui import market_explorer_page
 from ..workspace.pages import chart_terminal_page, stock_research_page, screener_page
 from ..workspace.strategy_pages import strategy_builder_page, strategy_backtesting_page, backtest_comparison_page
+from ..workspace.monitor_pages import alert_center_page, strategy_paper_page
 from .theme import apply_theme
 from .trader import load_trader_config, run_auto_trader_tick
 
@@ -90,6 +91,8 @@ def _build_navigation_pages(ctx):
             ),
         ],
         "Research": [
+            st.Page(alert_center_page, title="Local Alerts", icon=":material/notifications_active:", url_path="local-alerts"),
+            st.Page(strategy_paper_page, title="Strategy Simulations", icon=":material/science:", url_path="strategy-simulations"),
             st.Page(
                 strategy_builder_page, title="Strategy Builder", icon=":material/rule:", url_path="strategy-builder",
             ),
@@ -164,6 +167,8 @@ def render_app() -> None:
                 st.Page(strategy_builder_page, title="Strategy Builder", icon=":material/rule:", url_path="strategy-builder"),
                 st.Page(strategy_backtesting_page, title="Strategy Backtests", icon=":material/query_stats:", url_path="strategy-backtests"),
                 st.Page(backtest_comparison_page, title="Backtest Comparison", icon=":material/compare_arrows:", url_path="backtest-comparison"),
+                st.Page(alert_center_page, title="Local Alerts", icon=":material/notifications_active:", url_path="local-alerts"),
+                st.Page(strategy_paper_page, title="Strategy Simulations", icon=":material/science:", url_path="strategy-simulations"),
             ],
             "Simulation": [
                 st.Page(
