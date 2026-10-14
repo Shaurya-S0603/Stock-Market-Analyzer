@@ -8,7 +8,7 @@ from stockmarket.workspace import indicators as ind
 
 def bars(n=100):
     x = np.arange(n, dtype=float)
-    close = pd.Series(100 + x * .3 + np.sin(x / 3))
+    close = 100 + x * .3 + np.sin(x / 3)
     return pd.DataFrame({
         "open": close - .1, "high": close + 1.5, "low": close - 1.5,
         "close": close, "volume": 1000 + x,
@@ -73,7 +73,8 @@ def test_indicators_are_causal_when_future_rows_are_added():
     for function in [ind.sma, ind.ema, ind.wma, ind.rsi, ind.atr, ind.roc,
                      ind.obv, ind.vwap_utc_day, ind.breakout_levels, ind.macd, ind.bollinger, ind.stochastic]:
         left, right = function(prefix), function(full).iloc[:85]
-        pd.testing.assert_equal(left, right)
+        (pd.testing.assert_frame_equal(left, right) if isinstance(left, pd.DataFrame)
+         else pd.testing.assert_series_equal(left, right))
 
 
 def test_invalid_settings_rejected():
