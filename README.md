@@ -167,3 +167,23 @@ python -m compileall -q StockMarketAnalyzer.py streamlit_app.py paper_worker.py 
 GitHub Actions executes the complete regression suite and source compilation before release changes are merged. For v1.0.0, a second release workflow waits for successful `main` CI before creating the `v1.0.0` tag and GitHub release.
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) and [RELEASE_NOTES_v1.0.md](RELEASE_NOTES_v1.0.md).
+
+
+## QuantEdge 2.0 local-first migration (Phase 0/1)
+
+The new master architecture is **Streamlit + Python + SQLite**, not a Next.js or external-backend rebuild. The established AI/paper functionality remains available while new phases land.
+
+**Canonical local startup:**
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+New **Market Explorer** navigation supports persistent named watchlists, explicit provider download, historical candlesticks/line chart, CSV exports and offline saved candle inspection. Watchlist storage is in `.data/workspace.db` (override with `QUANTEDGE_WORKSPACE_DB`) and deliberately separate from `.data/paper_trading.db`. After entering the existing portfolio onboarding, open **Market Explorer**. The full QuantEdge 2.0 app flow will be expanded in phases.
+
+Market data is historical/cached, **not guaranteed real-time**, and provider coverage depends on free Yahoo availability. Use the Refresh action for downloads; other reruns do not silently query the provider. A fetch error with a prior saved dataset uses a clearly labeled cached fallback. Local SQLite works across restarts; cloud-local storage is ephemeral.
+
+Detailed roadmap and the Phase 0/1 technical audit: [docs/QUANTEDGE_V2_MASTER_PLAN.md](docs/QUANTEDGE_V2_MASTER_PLAN.md).
