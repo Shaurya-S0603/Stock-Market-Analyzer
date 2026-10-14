@@ -42,7 +42,8 @@ def test_activation_does_not_backfill_and_only_confirmed_bars_fill(tmp_path):
     assert paper.cycle(account)["status"]=="unchanged"
     # New provisional bar cannot be read as completed.
     cache(db,[100.,100.,100.,100.,100.,100.,105.])
-    assert paper.cycle(account)["status"]=="unchanged"
+    first_cycle = paper.cycle(account)
+    assert first_cycle["bars"]==1 and first_cycle["fills"]==0
     # The 105 bar now completed, produces an entry signal.
     cache(db,[100.,100.,100.,100.,100.,100.,105.,106.])
     assert paper.cycle(account)["bars"]==1
