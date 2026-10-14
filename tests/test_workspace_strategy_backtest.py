@@ -81,6 +81,7 @@ def test_gap_through_stop_uses_open_price():
     # Entry fills on day 5 at 100; the adverse opening gap arrives on day 6.
     frame.loc[frame.index[5], ["open","high","low","close"]] = [80,90,75,82]
     conf = strategy(entry=[{"type":"price_above_sma", "period":2}],
+                    exit=[{"type":"rsi_threshold", "direction":"above", "threshold":100, "period":2}],
                     risk={"stop_loss_pct":5, "take_profit_pct":10})
     result = run_backtest(frame, conf, starting_cash=10000)
     trade = result["trades"][0]
