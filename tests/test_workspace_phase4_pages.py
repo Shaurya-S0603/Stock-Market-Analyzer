@@ -12,8 +12,13 @@ def test_pages_render_offline(name,tmp_path,monkeypatch):
 
 
 def test_cached_worker_runs_without_network_or_paper_profile(tmp_path):
-    from workspace_worker import run_once
-    result=run_once(str(tmp_path/"worker.db"),refresh=False)
+    import importlib.util
+    from pathlib import Path
+    source=Path(__file__).resolve().parents[1]/"workspace_worker.py"
+    spec=importlib.util.spec_from_file_location("workspace_worker",source)
+    module=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    result=module.run_once(str(tmp_path/"worker.db"),refresh=False)
     assert result["alerts"]["new_events"]==0
     assert result["paper_cycles"]==[]
     assert result["errors"]==[]
