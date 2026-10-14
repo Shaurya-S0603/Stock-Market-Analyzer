@@ -29,7 +29,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Compile sources
-        run: python -m compileall -q app.py StockMarketAnalyzer.py streamlit_app.py paper_worker.py src tests
+        run: python -m compileall -q app.py StockMarketAnalyzer.py streamlit_app.py paper_worker.py workspace_worker.py src tests
 
       - name: Run regression tests
         run: pytest -q
