@@ -6,6 +6,7 @@ from io import BytesIO, StringIO
 import re
 
 import pandas as pd
+import numpy as np
 
 from .database import WorkspaceDB, clean_symbol
 from .market_data import VALID_INTERVALS, validate_history
@@ -76,6 +77,10 @@ def import_history_csv(db: WorkspaceDB, content: bytes, *, symbol: str,
                 rows = existing.loc[overlap]
                 if any(rows["provider"] != provider) or any(rows["adjustment_mode"] != adjustment):
                     raise ValueError("Import would overwrite observations from a different provider or price basis")
+                old_values = rows.loc[:, REQUIRED[1:]].to_numpy(dtype=float)
+                new_values = normalized.loc[overlap, REQUIRED[1:]].to_numpy(dtype=float)
+                if not np.allclose(old_values, new_values, rtol=1e-10, atol=1e-10):
+                    raise ValueError("Import would revise existing prices; a separate review is required")
         count = db.save_candles(clean, interval, normalized, provider=provider,
                                 adjustment_mode=adjustment)
         return {"symbol": clean, "interval": interval, "bars_imported": count,
