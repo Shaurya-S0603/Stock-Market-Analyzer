@@ -18,6 +18,7 @@ from .site_pages import (
     settings_page,
     trade_journal_page,
 )
+from ..workspace.ui import market_explorer_page
 from .theme import apply_theme
 from .trader import load_trader_config, run_auto_trader_tick
 
@@ -48,6 +49,12 @@ def _build_navigation_pages(ctx):
                 title="Dashboard",
                 icon=":material/dashboard:",
                 default=True,
+            ),
+            st.Page(
+                market_explorer_page,
+                title="Market Explorer",
+                icon=":material/monitoring:",
+                url_path="market-explorer",
             ),
             st.Page(
                 lambda: markets_page(ctx),

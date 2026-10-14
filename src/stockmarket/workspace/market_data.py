@@ -47,7 +47,7 @@ def validate_history(raw: pd.DataFrame, interval: str) -> pd.DataFrame:
         frame.index = frame.index.tz_localize("UTC")
     else:
         frame.index = frame.index.tz_convert("UTC")
-    frame = frame.loc[:, OHLCV].sort_index()
+    frame = frame.loc[:, list(OHLCV)].sort_index()
     for col in OHLCV:
         frame[col] = pd.to_numeric(frame[col], errors="coerce")
     if not np.isfinite(frame.to_numpy(dtype=float)).all():
