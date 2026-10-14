@@ -111,14 +111,19 @@ def market_explorer_page() -> None:
     st.subheader("Saved watchlist")
     overview = []
     for symbol in symbols:
-        daily = db.load_candles(symbol, "1d")
-        if daily.empty:
-            overview.append({"Symbol": symbol, "Last historical close": None, "UTC timestamp": None, "Source": "not downloaded"})
-        else:
-            last = daily.iloc[-1]
+        try:
+            quote = service.saved_quote(symbol)
             overview.append({
-                "Symbol": symbol, "Last historical close": float(last["close"]),
-                "UTC timestamp": str(daily.index[-1]), "Source": "saved historical cache",
+                "Symbol": quote.symbol, "Saved close": quote.price,
+                "Daily change": quote.change, "Daily change (%)": quote.change_pct,
+                "UTC session label": quote.observed_at,
+                "Data type": quote.origin, "Provider": quote.provider,
+            })
+        except MarketDataError:
+            overview.append({
+                "Symbol": symbol, "Saved close": None,
+                "Daily change": None, "Daily change (%)": None,
+                "UTC session label": None, "Data type": "not downloaded", "Provider": None,
             })
     st.dataframe(overview, hide_index=True, use_container_width=True)
 
