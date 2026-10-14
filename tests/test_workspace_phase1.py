@@ -100,3 +100,13 @@ def test_workspace_database_does_not_reset_existing_candles(tmp_path):
 
 def test_primary_app_entrypoint_exists():
     assert Path("app.py").is_file()
+
+
+def test_fresh_streamlit_app_opens_market_explorer_without_paper_account(tmp_path, monkeypatch):
+    from streamlit.testing.v1 import AppTest
+    monkeypatch.setenv("QUANTEDGE_WORKSPACE_DB", str(tmp_path / "new-workspace.db"))
+    monkeypatch.setenv("PAPER_DB_PATH", str(tmp_path / "unused-paper.db"))
+    app = AppTest.from_file(Path("app.py").resolve(), default_timeout=20).run()
+    assert not app.exception
+    assert any("Market Explorer" in item.value for item in app.title)
+    assert (tmp_path / "new-workspace.db").exists()
