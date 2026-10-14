@@ -52,7 +52,7 @@ def test_macd_bollinger_stochastic_atr_and_breakouts():
     assert bb["Upper"].iloc[-1] > bb["Lower"].iloc[-1]
     osc = ind.stochastic(frame)
     assert 0 <= osc["%K"].iloc[-1] <= 100
-    assert ind.atr(frame).iloc[-1] >= 3
+    assert ind.atr(frame).iloc[-1] == pytest.approx(3.0, abs=1e-10)
     prior = ind.breakout_levels(frame, 20)
     assert prior["Prior high"].iloc[-1] == pytest.approx(frame["high"].iloc[-21:-1].max())
     assert ind.obv(frame).iloc[0] == 0
