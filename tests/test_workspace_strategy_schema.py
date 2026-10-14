@@ -34,8 +34,10 @@ def test_invalid_numeric_ranges_and_rule_types_rejected():
         Rule(type="shell_command")
     with pytest.raises(ValidationError):
         Rule(type="sma_cross", fast_period=50, slow_period=20)
+    bad = example_strategy().model_dump()
+    bad["risk"]["value"] = 101
     with pytest.raises(ValidationError):
-        example_strategy().model_copy(update={"risk": {"sizing":"percent_of_equity","value":101}})
+        parse_strategy(bad)
     config = example_strategy().model_dump()
     config["risk"]["value"] = -1
     with pytest.raises(ValidationError):
