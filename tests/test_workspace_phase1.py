@@ -110,3 +110,16 @@ def test_fresh_streamlit_app_opens_market_explorer_without_paper_account(tmp_pat
     assert not app.exception
     assert any("Market Explorer" in item.value for item in app.title)
     assert (tmp_path / "new-workspace.db").exists()
+
+
+def test_saved_quote_never_claims_to_be_realtime(tmp_path):
+    db = WorkspaceDB(str(tmp_path / "market.db"))
+    service = MarketDataService(db, YahooMarketAdapter(lambda **kw: sample_bars()))
+    with pytest.raises(MarketDataError, match="No saved"):
+        service.saved_quote("MSFT")
+    service.history("MSFT", period="6mo", interval="1d", refresh=True)
+    quote = service.saved_quote("MSFT")
+    assert quote.origin == "saved historical close"
+    assert quote.change is not None and quote.change > 0
+    assert quote.change_pct is not None and quote.change_pct > 0
+    assert quote.observed_at.endswith("+00:00")
