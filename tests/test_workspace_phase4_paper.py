@@ -59,7 +59,7 @@ def test_activation_does_not_backfill_and_only_confirmed_bars_fill(tmp_path):
     restarted=PaperStrategyRepository(WorkspaceDB(str(file)))
     assert restarted.summary(account)["shares"]==3
     assert len(restarted.list_fills(account))==1
-    assert len(restarted.list_decisions(account))==2
+    assert len(restarted.list_decisions(account))==3
     assert not (tmp_path/"paper_trading.db").exists()
 
 
