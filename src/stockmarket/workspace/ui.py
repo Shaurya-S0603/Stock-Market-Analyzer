@@ -144,8 +144,14 @@ def market_explorer_page() -> None:
     chart_type = actions[2].radio("Chart", ["Candles", "Line"], horizontal=True)
 
     try:
-        # No background downloads just because Streamlit reran; explicit Refresh is deliberate.
-        result = service.history(symbol, period=period, interval=interval, refresh=refresh, offline=not refresh)
+        # Never fetch on a rerun; only an explicit refresh is allowed to call Yahoo.
+        effective_refresh = refresh and not offline
+        if refresh and offline:
+            st.info("Offline mode is enabled. Showing cache without contacting the provider.")
+        result = service.history(
+            symbol, period=period, interval=interval,
+            refresh=effective_refresh, offline=not effective_refresh,
+        )
     except MarketDataError as exc:
         st.info(str(exc))
         result = None
