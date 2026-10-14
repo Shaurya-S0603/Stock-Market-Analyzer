@@ -22,6 +22,7 @@ from ..workspace.ui import market_explorer_page
 from ..workspace.pages import chart_terminal_page, stock_research_page, screener_page
 from ..workspace.strategy_pages import strategy_builder_page, strategy_backtesting_page, backtest_comparison_page
 from ..workspace.monitor_pages import alert_center_page, strategy_paper_page
+from ..workspace.data_management import data_management_page
 from .theme import apply_theme
 from .trader import load_trader_config, run_auto_trader_tick
 
@@ -140,6 +141,7 @@ def _build_navigation_pages(ctx):
             ),
         ],
         "System": [
+            st.Page(data_management_page, title="Data Management", icon=":material/storage:", url_path="data-management"),
             st.Page(
                 lambda: settings_page(ctx),
                 title="Settings",
@@ -169,6 +171,9 @@ def render_app() -> None:
                 st.Page(backtest_comparison_page, title="Backtest Comparison", icon=":material/compare_arrows:", url_path="backtest-comparison"),
                 st.Page(alert_center_page, title="Local Alerts", icon=":material/notifications_active:", url_path="local-alerts"),
                 st.Page(strategy_paper_page, title="Strategy Simulations", icon=":material/science:", url_path="strategy-simulations"),
+            ],
+            "System": [
+                st.Page(data_management_page, title="Data Management", icon=":material/storage:", url_path="data-management"),
             ],
             "Simulation": [
                 st.Page(
