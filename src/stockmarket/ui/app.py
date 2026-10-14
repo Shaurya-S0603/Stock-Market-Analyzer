@@ -20,6 +20,7 @@ from .site_pages import (
 )
 from ..workspace.ui import market_explorer_page
 from ..workspace.pages import chart_terminal_page, stock_research_page, screener_page
+from ..workspace.strategy_pages import strategy_builder_page, strategy_backtesting_page, backtest_comparison_page
 from .theme import apply_theme
 from .trader import load_trader_config, run_auto_trader_tick
 
@@ -90,6 +91,15 @@ def _build_navigation_pages(ctx):
         ],
         "Research": [
             st.Page(
+                strategy_builder_page, title="Strategy Builder", icon=":material/rule:", url_path="strategy-builder",
+            ),
+            st.Page(
+                strategy_backtesting_page, title="Strategy Backtests", icon=":material/query_stats:", url_path="strategy-backtests",
+            ),
+            st.Page(
+                backtest_comparison_page, title="Backtest Comparison", icon=":material/compare_arrows:", url_path="backtest-comparison",
+            ),
+            st.Page(
                 stock_research_page,
                 title="Stock Research",
                 icon=":material/article:",
@@ -151,6 +161,9 @@ def render_app() -> None:
                 st.Page(chart_terminal_page, title="Charts", icon=":material/show_chart:", url_path="charts"),
                 st.Page(stock_research_page, title="Stock Research", icon=":material/article:", url_path="stock-research"),
                 st.Page(screener_page, title="Stock Screener", icon=":material/filter_alt:", url_path="stock-screener"),
+                st.Page(strategy_builder_page, title="Strategy Builder", icon=":material/rule:", url_path="strategy-builder"),
+                st.Page(strategy_backtesting_page, title="Strategy Backtests", icon=":material/query_stats:", url_path="strategy-backtests"),
+                st.Page(backtest_comparison_page, title="Backtest Comparison", icon=":material/compare_arrows:", url_path="backtest-comparison"),
             ],
             "Simulation": [
                 st.Page(
