@@ -32,4 +32,17 @@ jobs:
         run: python -m compileall -q app.py StockMarketAnalyzer.py streamlit_app.py paper_worker.py workspace_worker.py src tests
 
       - name: Run regression tests
-        run: pytest -q
+        run: |
+          mkdir -p artifacts
+          pytest -q --junitxml=artifacts/pytest-results.xml
+
+      - name: Generate automated feature verification evidence
+        run: python scripts/verify_features.py artifacts/pytest-results.xml --output artifacts/feature_evidence.json
+
+      - name: Retain full test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quantedge-verification-py-${{ matrix.python-version }}
+          path: artifacts/
+          retention-days: 30
