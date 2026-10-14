@@ -198,3 +198,20 @@ The simulator tracks cash, positions, fees, slippage, rejected fills, conservati
 To begin, run `streamlit run app.py`, obtain candles in **Market Explorer** or **Charts**, and use the new Strategy Builder. The legacy AI/backtest and paper-portfolio services remain separate.
 
 See [Phase 3 methodology](docs/PHASE_3_STRATEGIES_BACKTESTS.md) for exact assumptions and limitations.
+
+
+## QuantEdge 2.0 Phase 4: Isolated Paper Simulations and Local Alerts
+
+Phase 4 adds **Strategy Simulations** and **Local Alerts** to the Streamlit navigation, including the research-only startup before creating a legacy portfolio. Each simulated strategy account freezes an immutable strategy snapshot, owns its own cash, risk settings, and orders, and starts **paused**. Enabling checkpoints the most recent confirmed bar, rather than issuing retroactive purchases. Phase 4 neither changes nor shares the original AI Trader portfolio.
+
+Local alerts support price, RSI, SMA and pinned strategy-entry/exit signals on **completed, saved historical bars**. Crossing notifications are stored and deduplicated in the workspace SQLite database, and are visible inside the app; external push/email/SMS delivery is not included.
+
+The one-cycle worker runs against offline cached prices by default:
+
+    python workspace_worker.py
+
+To explicitly request new best-effort historical bars from the free provider before processing:
+
+    python workspace_worker.py --refresh
+
+The worker is not a guaranteed live feed or always-on hosted service. Durable historical simulated state requires durable local SQLite storage, and Cloud's local filesystem is ephemeral. Details: [Phase 4 monitoring and simulation](docs/PHASE_4_MONITORING.md).
