@@ -212,13 +212,16 @@ class PaperStrategyRepository:
                     processed += 1
                     reason = "hold"
                     decision = "HOLD"
-                    if qty and bool(signals["exit"].iloc[i-1]):
+                    bars_held = (i - completed.index.get_loc(pd.Timestamp(entry_bar))) if entry_bar else 0
+                    timed_exit = bool(qty and cfg.risk.max_holding_bars is not None
+                                      and bars_held >= cfg.risk.max_holding_bars)
+                    if qty and (bool(signals["exit"].iloc[i-1]) or timed_exit):
                         sell_price = open_price * (1 - cfg.costs.slippage_pct/100)
                         fee = _fee(qty, sell_price, cfg.costs)
                         pnl = qty * (sell_price - cost) - entry_fee - fee
                         cash += qty*sell_price - fee
                         realized += pnl
-                        record(i,"sell",qty,sell_price,fee,pnl,"signal_exit")
+                        record(i,"sell",qty,sell_price,fee,pnl,"time_exit" if timed_exit and not bool(signals["exit"].iloc[i-1]) else "signal_exit")
                         qty, cost, entry_fee, high, entry_bar = 0,0.,0.,0.,None
                         reason, decision = "closed on prior completed-bar exit signal","SELL"
                     elif not qty and bool(signals["entry"].iloc[i-1]):
