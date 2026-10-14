@@ -46,8 +46,10 @@ def validate_chart(config: dict) -> dict:
     if chart_type not in CHART_TYPES:
         raise ValueError("Unsupported chart type")
     indicators = config.get("indicators", ["SMA", "RSI"])
-    if not isinstance(indicators, list) or len(indicators) > 12 or len(set(indicators)) != len(indicators) or any(x not in INDICATORS for x in indicators):
+    if not isinstance(indicators, list) or len(indicators) > 12 or any(not isinstance(x, str) for x in indicators) or len(set(indicators)) != len(indicators) or any(x not in INDICATORS for x in indicators):
         raise ValueError("Unsupported or duplicated chart indicator")
+    if "VWAP" in indicators and interval not in {"1m", "5m", "15m", "1h"}:
+        raise ValueError("VWAP requires intraday market data")
     length = config.get("length", 20)
     rsi_length = config.get("rsi_length", 14)
     std = config.get("bollinger_std", 2.0)
