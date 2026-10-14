@@ -1,0 +1,61 @@
+name: Publish QuantEdge v2 Release
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exactly validated commit
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Publish once if main still points to tested commit
+        env:
+          VALIDATED_SHA: \${{ github.event.workflow_run.head_sha }}
+          GH_TOKEN: \${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          if [[ "$(git rev-parse origin/main)" != "$VALIDATED_SHA" ]]; then
+            echo "Main changed since test. Skip stale release."
+            exit 0
+          fi
+          VERSION=$(python - <<'PY'
+          import tomllib
+          with open('pyproject.toml','rb') as handle:
+              print(tomllib.load(handle)['project']['version'])
+          PY
+          )
+          if [[ "$VERSION" != 2.* ]]; then
+            echo "Not a v2 release; skip."
+            exit 0
+          fi
+          TAG="v\${VERSION}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG exists; skip."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag -a "$TAG" -m "QuantEdge $TAG"
+            git push origin "$TAG"
+          fi
+          if [[ "$VERSION" == "2.0.0" && -f RELEASE_NOTES_v2.0.0.md ]]; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "QuantEdge $TAG - Free Streamlit Edition" --notes-file RELEASE_NOTES_v2.0.0.md
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "QuantEdge $TAG - Free Streamlit Edition" --generate-notes
+          fi
