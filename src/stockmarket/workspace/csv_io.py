@@ -9,13 +9,13 @@ import pandas as pd
 import numpy as np
 
 from .database import WorkspaceDB, clean_symbol
-from .market_data import VALID_INTERVALS, validate_history
+from .market_data import VALID_INTERVALS, validate_history, MarketDataError
 
 MAX_CSV_BYTES = 15 * 1024 * 1024
 MAX_CSV_BARS = 20000
 REQUIRED = ["timestamp", "open", "high", "low", "close", "volume"]
 METADATA = ["provider", "adjustment_mode"]
-TZ_SUFFIX = re.compile(r"(Z|[+-]\d{2}:\d{2})$", re.IGNORECASE)
+TZ_SUFFIX = re.compile(r"(Z|[+-]\d{2}:?\d{2})$", re.IGNORECASE)
 
 
 def export_history_csv(db: WorkspaceDB, symbol: str, interval: str) -> bytes:
@@ -69,7 +69,10 @@ def import_history_csv(db: WorkspaceDB, content: bytes, *, symbol: str,
             adjustment = "raw"
         if not provider.strip() or len(provider) > 80:
             raise ValueError("CSV provider name invalid")
-        normalized = validate_history(frame, interval)
+        try:
+            normalized = validate_history(frame, interval)
+        except MarketDataError as exc:
+            raise ValueError(str(exc)) from exc
         existing = db.load_candles(clean, interval)
         if not existing.empty:
             overlap = existing.index.intersection(normalized.index)
