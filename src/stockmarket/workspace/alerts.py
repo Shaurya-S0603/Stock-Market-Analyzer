@@ -166,6 +166,7 @@ class AlertRepository:
         """Transactionally checkpoint and deduplicate. Concurrent workers serialize in SQLite."""
         total = 0
         examined = 0
+        strategies = StrategyRepository(self.db)
         # IMMEDIATE acquires SQLite's single writer lock before reading checkpoints.
         with self.db.engine.connect() as conn:
             conn.exec_driver_sql("BEGIN IMMEDIATE")
@@ -175,7 +176,7 @@ class AlertRepository:
                     completed = _valid_history(self.db, cfg)
                     if completed.empty or _stamp(completed.index[-1]) <= row["last_processed"]:
                         continue
-                    condition = _condition(completed, cfg, StrategyRepository(self.db))
+                    condition = _condition(completed, cfg, strategies)
                     for ts in completed.index:
                         stamp = _stamp(ts)
                         if stamp <= row["last_processed"]:
