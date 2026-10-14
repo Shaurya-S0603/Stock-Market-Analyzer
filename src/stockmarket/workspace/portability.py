@@ -7,6 +7,7 @@ No SQL scripts are imported. No unrestricted ZIP extraction.
 """
 from __future__ import annotations
 
+from contextlib import closing
 from datetime import datetime, timezone
 from hashlib import sha256
 from io import BytesIO
@@ -31,7 +32,7 @@ MAX_MANIFEST = 10000
 def _check_sqlite(path: Path, *, workspace: bool) -> None:
     uri = f"{path.resolve().as_uri()}?mode=ro"
     try:
-        with sqlite3.connect(uri, uri=True, timeout=5) as connection:
+        with closing(sqlite3.connect(uri, uri=True, timeout=5)) as connection:
             if connection.execute("PRAGMA integrity_check").fetchone() != ("ok",):
                 raise ValueError("SQLite integrity check failed")
             if workspace:
@@ -50,8 +51,8 @@ def _snapshot(source: Path) -> bytes:
     with tempfile.TemporaryDirectory() as tmp:
         target = Path(tmp) / "snapshot.sqlite"
         # SQLite online backup includes committed WAL changes consistently.
-        with sqlite3.connect(str(source), timeout=10) as original:
-            with sqlite3.connect(str(target)) as snapshot:
+        with closing(sqlite3.connect(str(source), timeout=10)) as original:
+            with closing(sqlite3.connect(str(target))) as snapshot:
                 original.backup(snapshot)
         if target.stat().st_size > MAX_DATABASE:
             raise ValueError("SQLite snapshot exceeded the backup size limit")
