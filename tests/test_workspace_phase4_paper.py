@@ -94,3 +94,37 @@ def test_multiple_accounts_do_not_share_cash_and_disabled_stays_unchanged(tmp_pa
     assert paper.summary(first)["shares"]==3
     assert paper.summary(second)["shares"]==0
     assert not paper.summary(second)["enabled"]
+
+
+
+def test_paper_position_can_exit_on_confirmed_adverse_open_without_negative_cash(tmp_path):
+    db=WorkspaceDB(str(tmp_path/"stops.db"))
+    cache(db,[100.,100.,100.,100.,100.,100.])
+    config={
+        "name":"Stops fixture","symbol":"MSFT","timeframe":"1d",
+        "entry":{"rules":[{"type":"price_above_sma","period":2}]},
+        "exit":{"rules":[{"type":"rsi_threshold","period":2,
+                          "direction":"above","threshold":100.}]},
+        "risk":{"sizing":"fixed_quantity","value":3.,
+                "stop_loss_pct":5.,"take_profit_pct":None},
+        "costs":{"commission_fixed":1.,"commission_pct":0.,"slippage_pct":0.},
+    }
+    strategy=StrategyRepository(db).save(config)
+    paper=PaperStrategyRepository(db)
+    acct=paper.create(strategy["id"],starting_cash=1000.)
+    paper.set_enabled(acct,True)
+    cache(db,[100.,100.,100.,100.,100.,100.,105.,106.,107.])
+    assert paper.cycle(acct)["fills"]==1
+    assert paper.summary(acct)["shares"]==3
+    # The 85 bar first becomes completed once a subsequent (provisional) bar exists.
+    cache(db,[100.,100.,100.,100.,100.,100.,105.,106.,107.,85.,84.])
+    completed=paper.cycle(acct)
+    assert completed["fills"]==1
+    assert paper.summary(acct)["shares"]==0
+    assert paper.summary(acct)["cash"]>=0
+    journal=paper.list_fills(acct)
+    assert journal[0]["reason"]=="protective_stop"
+    assert journal[0]["side"]=="sell"
+    assert journal[0]["price"]==pytest.approx(85.)
+    assert paper.cycle(acct)["status"]=="unchanged"
+    assert len(paper.list_fills(acct))==2
