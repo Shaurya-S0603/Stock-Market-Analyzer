@@ -16,13 +16,13 @@ jobs:
       - name: Checkout exactly validated commit
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
       - name: Publish once if main still points to tested commit
         env:
-          VALIDATED_SHA: \${{ github.event.workflow_run.head_sha }}
-          GH_TOKEN: \${{ github.token }}
+          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -41,7 +41,7 @@ jobs:
             echo "Not a v2 release; skip."
             exit 0
           fi
-          TAG="v\${VERSION}"
+          TAG="v${VERSION}"
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release $TAG exists; skip."
             exit 0
