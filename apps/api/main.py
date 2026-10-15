@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from functools import lru_cache
+import os
 import math
 from typing import Literal
 
@@ -52,6 +53,52 @@ def health() -> dict:
         "database": "not-connected-in-foundation",
         "brokerage": "disabled",
     }
+
+
+@app.get("/api/v1/health/dependencies")
+def dependency_health() -> dict:
+    """Actually probe configured PostgreSQL and Redis, without leaking credentials.
+
+    The foundation does NOT write user data to these services yet.
+    """
+    from sqlalchemy import create_engine, text
+    import redis
+
+    states: dict[str, str] = {"postgres": "not configured", "redis": "not configured"}
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        engine = None
+        try:
+            engine = create_engine(database_url, pool_pre_ping=True, connect_args={"connect_timeout": 3})
+            with engine.connect() as connection:
+                if connection.execute(text("SELECT 1")).scalar() != 1:
+                    raise ValueError("Unexpected database response")
+            states["postgres"] = "connected"
+        except Exception:
+            states["postgres"] = "unavailable"
+        finally:
+            if engine is not None:
+                engine.dispose()
+
+    redis_url = os.getenv("REDIS_URL")
+    if redis_url:
+        client = None
+        try:
+            client = redis.Redis.from_url(redis_url, socket_connect_timeout=3, socket_timeout=3)
+            states["redis"] = "connected" if client.ping() else "unavailable"
+        except Exception:
+            states["redis"] = "unavailable"
+        finally:
+            if client is not None:
+                client.close()
+
+    ready = all(value != "unavailable" for value in states.values())
+    return JSONResponse(
+        {"status": "ok" if ready else "degraded",
+         "dependencies": states,
+         "note": "Connectivity probe only. Database-backed user persistence is a later phase."},
+        status_code=200 if ready else 503,
+    )
 
 
 @app.get("/api/v1/symbols")
