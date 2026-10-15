@@ -8,6 +8,8 @@ from __future__ import annotations
 import streamlit as st
 
 from ..workspace.home import personal_dashboard_page
+from ..workspace.tutorial import tutorial_page
+from ..workspace.runtime import is_public_demo
 from ..workspace.ui import market_explorer_page
 from ..workspace.pages import chart_terminal_page, stock_research_page, screener_page
 from ..workspace.strategy_pages import (
@@ -24,6 +26,7 @@ def navigation_pages():
     return {
         "Workspace": [
             st.Page(personal_dashboard_page, title="Overview", icon=":material/dashboard:", default=True),
+            st.Page(tutorial_page, title="Start Here", icon=":material/school:", url_path="start-here"),
             st.Page(market_explorer_page, title="Market Explorer", icon=":material/search:", url_path="markets"),
             st.Page(chart_terminal_page, title="Trading Charts", icon=":material/show_chart:", url_path="charts"),
             st.Page(stock_research_page, title="Stock Research", icon=":material/article:", url_path="research"),
@@ -53,5 +56,7 @@ def render_app() -> None:
         st.divider()
         st.caption("**PAPER / HISTORICAL DATA ONLY**")
         st.caption("No broker connection or automated real-money execution.")
+        if is_public_demo():
+            st.warning("PUBLIC DEMO: browser-session-only temporary practice data.")
     router = st.navigation(navigation_pages(), position="sidebar", expanded=True)
     router.run()
