@@ -17,7 +17,7 @@ for a public deployment.
 ## Start servers without Docker
 Use Python 3.12 and Node.js 22 (Next.js 16 needs Node >=20.9):
 
-    python -m pip install -r requirements.txt
+    python -m pip install -r requirements.txt -r apps/api/requirements.txt
     python -m uvicorn apps.api.main:app --reload --port 8000
 
 In another shell:

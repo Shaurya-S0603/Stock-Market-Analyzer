@@ -1,3 +1,5 @@
+> **QuantEdge v3 migration (in development):** The Next.js + FastAPI rebuild is being verified stage-by-stage. The last released Streamlit v2.1.1 website remains usable and is not being deleted. For the new developer preview, see [v3 Phase 0 quickstart](docs/V3_PHASE0_QUICKSTART.md) and [master roadmap](docs/V3_REBUILD_MASTER_PLAN.md). The preview serves fictional research data and no brokerage actions.
+
 # QuantEdge 2.1.1 | Free Personal Streamlit Strategy Website
 
 QuantEdge is a **single-user, local-first Streamlit** market research, interactive charting, strategy backtesting, and paper-only trading workstation. No paid API, cloud database, broker login, Next.js backend, or subscription required.
