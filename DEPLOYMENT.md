@@ -1,4 +1,4 @@
-# QuantEdge 2.1 | Free Local Installation and Deployment
+# QuantEdge 2.1.1 | Free Streamlit Website and Local Installation
 
 QuantEdge is a **single-user, local-first Streamlit research and paper simulation** application.
 
@@ -29,3 +29,10 @@ pytest -q
 GitHub CI builds on Python 3.12/3.13/3.14 and generates a JUnit XML plus feature evidence JSON. Results certify tests, not external provider uptime or browser/device deployment.
 
 Read docs/PRODUCT_SPEC.md and docs/PHASE_5_OPERATIONS.md for boundaries and recovery instructions.
+
+
+## Public Streamlit Community Cloud deployment
+
+Use [Streamlit Community Cloud](https://share.streamlit.io). Select repository **Shaurya-S0603/Quant-Edge-Terminal**, branch **main**, Python **3.12** and main file **app.py**. Under Advanced settings > Secrets, add the root-level TOML `QUANTEDGE_PUBLIC_DEMO = "1"` to isolate visitor SQLite histories. Do not deploy without this setting on a shared public URL. Select an available subdomain and Deploy from your Streamlit account.
+
+The site includes a **Start Here** page: load the explicitly synthetic QEDMO example, study its chart, run an SMA/RSI backtest, and try manual paper trading. See [docs/STREAMLIT_WEBSITE_TUTORIAL.md](docs/STREAMLIT_WEBSITE_TUTORIAL.md) for every step and troubleshooting. Public-demo data is deliberately temporary; private persistent storage requires local hosting or a separate authenticated backend.

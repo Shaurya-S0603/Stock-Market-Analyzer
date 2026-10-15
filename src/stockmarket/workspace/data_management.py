@@ -1,6 +1,8 @@
 """Local data portability and verification controls, available without paper onboarding."""
 from __future__ import annotations
 
+from .runtime import workspace_path, is_public_demo
+
 from datetime import datetime, timezone
 import os
 from pathlib import Path
@@ -18,14 +20,15 @@ from .ui import workspace_db
 def data_management_page() -> None:
     st.title("Data Management & Recovery")
     st.caption("Local-first research storage. No brokerage transfers, user logins or paid cloud dependency.")
-    db = workspace_db(os.getenv("QUANTEDGE_WORKSPACE_DB", ".data/workspace.db"))
+    db = workspace_db(workspace_path())
     st.info(
         "The v2 workspace and legacy AI Trader use independent SQLite files. "
         "Backup both when available. Restores are staged and NEVER replace running databases."
     )
     with st.expander("Database locations and data integrity", expanded=True):
         st.code(f"Workspace database: {Path(db.path).resolve()}")
-        legacy = os.getenv("PAPER_DB_PATH", ".data/paper_trading.db")
+        legacy = (str(__import__("pathlib").Path(workspace_path()).with_name("no-legacy-paper.sqlite"))
+                  if is_public_demo() else os.getenv("PAPER_DB_PATH", ".data/paper_trading.db"))
         st.code(f"Legacy paper database: {Path(legacy).resolve()}")
         with db.engine.connect() as conn:
             health = conn.exec_driver_sql("PRAGMA integrity_check").scalar()

@@ -1,6 +1,8 @@
 """Focused personal market terminal, not a generic ML/trader dashboard."""
 from __future__ import annotations
 
+from .runtime import workspace_path
+
 import os
 import pandas as pd
 import streamlit as st
@@ -16,7 +18,7 @@ def personal_dashboard_page() -> None:
     st.title("QuantEdge | Personal Market Workspace")
     st.caption("Your private TradingView-style research and strategy test bench. "
                "Quotes are historical/cached, not guaranteed live. All trading is simulated.")
-    db = workspace_db(os.getenv("QUANTEDGE_WORKSPACE_DB", ".data/workspace.db"))
+    db = workspace_db(workspace_path())
     symbols = db.cached_symbols()
     lists = db.list_watchlists()
     saved = StrategyRepository(db).list_strategies()

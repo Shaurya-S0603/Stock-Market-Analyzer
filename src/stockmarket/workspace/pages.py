@@ -1,6 +1,8 @@
 """User-facing Phase 2 Charts, Stock Research, and cached Stock Screener pages."""
 from __future__ import annotations
 
+from .runtime import workspace_path
+
 import os
 
 import streamlit as st
@@ -15,7 +17,7 @@ from .ui import workspace_db
 
 
 def _workspace():
-    db = workspace_db(os.getenv("QUANTEDGE_WORKSPACE_DB", ".data/workspace.db"))
+    db = workspace_db(workspace_path())
     return db, ResearchRepository(db)
 
 

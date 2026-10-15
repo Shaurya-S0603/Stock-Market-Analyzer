@@ -4,6 +4,8 @@ Research-only UI. Nothing here communicates with the paper account or brokerage.
 """
 from __future__ import annotations
 
+from .runtime import workspace_path
+
 import json
 import os
 
@@ -32,7 +34,7 @@ RULES = {
 
 
 def _db():
-    db = workspace_db(os.getenv("QUANTEDGE_WORKSPACE_DB", ".data/workspace.db"))
+    db = workspace_db(workspace_path())
     return db, StrategyRepository(db)
 
 

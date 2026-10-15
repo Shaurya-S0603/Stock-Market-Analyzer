@@ -1,6 +1,8 @@
 """Local notification center and isolated opt-in strategy simulation controls."""
 from __future__ import annotations
 
+from .runtime import workspace_path
+
 import os
 
 import pandas as pd
@@ -15,7 +17,7 @@ from .ui import workspace_db
 
 
 def _services():
-    db = workspace_db(os.getenv("QUANTEDGE_WORKSPACE_DB", ".data/workspace.db"))
+    db = workspace_db(workspace_path())
     return db, StrategyRepository(db), AlertRepository(db), PaperStrategyRepository(db)
 
 
