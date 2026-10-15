@@ -230,6 +230,22 @@ def strategy_builder_page() -> None:
         st.caption("Saved versions: " + ", ".join(f"v{v}" for v in history))
 
 
+def monthly_return_table(equity_points: list[dict], starting_cash: float) -> pd.DataFrame:
+    """Calendar-month change in marked simulated equity, no forward interpolation."""
+    if not equity_points:
+        return pd.DataFrame(columns=["Month", "Return %"])
+    values = pd.DataFrame(equity_points)
+    values["timestamp"] = pd.to_datetime(values["timestamp"], utc=True)
+    values = values.sort_values("timestamp").drop_duplicates("timestamp", keep="last")
+    month_keys = values["timestamp"].dt.strftime("%Y-%m")
+    last = values.groupby(month_keys, sort=True)["equity"].last()
+    prev = last.shift(1)
+    prev.iloc[0] = float(starting_cash)
+    out = (last / prev - 1) * 100
+    return pd.DataFrame({"Month": out.index.to_list(),
+                         "Return %": out.round(4).to_list()})
+
+
 def _results_view(result: dict) -> None:
     metrics = result["metrics"]
     st.subheader("Simulated performance")
@@ -251,6 +267,13 @@ def _results_view(result: dict) -> None:
                                          fill="tozeroy", name="Drawdown (%)"))
         drawdown.update_layout(template="plotly_dark", height=250)
         st.plotly_chart(drawdown, use_container_width=True)
+    monthly = monthly_return_table(result["equity"], metrics["starting_cash"])
+    st.subheader("Monthly strategy returns")
+    if monthly.empty:
+        st.info("No calendar-month return observations.")
+    else:
+        st.dataframe(monthly, use_container_width=True, hide_index=True)
+        st.caption("Returns are derived from saved mark-to-market equity. Partial months are included.")
     trades = pd.DataFrame(result["trades"])
     st.subheader("Closed trades")
     if trades.empty:

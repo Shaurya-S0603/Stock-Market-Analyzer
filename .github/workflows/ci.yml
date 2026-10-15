@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["main", "v0.7-quant-research-engine"]
+    branches: ["main"]
   pull_request:
 
 jobs:
@@ -29,7 +29,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Compile sources
-        run: python -m compileall -q app.py StockMarketAnalyzer.py streamlit_app.py paper_worker.py workspace_worker.py src tests
+        run: python -m compileall -q app.py workspace_worker.py src tests scripts
 
       - name: Run regression tests
         run: |

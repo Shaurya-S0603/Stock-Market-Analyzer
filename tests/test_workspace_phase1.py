@@ -108,7 +108,7 @@ def test_fresh_streamlit_app_opens_market_explorer_without_paper_account(tmp_pat
     monkeypatch.setenv("PAPER_DB_PATH", str(tmp_path / "unused-paper.db"))
     app = AppTest.from_file(Path("app.py").resolve(), default_timeout=20).run()
     assert not app.exception
-    assert any("Market Explorer" in item.value for item in app.title)
+    assert any("Personal Market Workspace" in item.value for item in app.title)
     assert (tmp_path / "new-workspace.db").exists()
 
 

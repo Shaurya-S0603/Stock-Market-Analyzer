@@ -1,3 +1,3 @@
-"""QuantEdge stock research and paper-trading toolkit."""
+"""QuantEdge: personal Streamlit market research and simulated trading."""
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"

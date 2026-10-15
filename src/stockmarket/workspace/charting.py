@@ -11,7 +11,7 @@ from .research_storage import validate_chart
 PANEL_INDICATORS = ["RSI", "MACD", "Stochastic", "ATR", "ROC", "OBV"]
 
 
-def build_chart(frame: pd.DataFrame, config: dict) -> go.Figure:
+def build_chart(frame: pd.DataFrame, config: dict, markers: list[dict] | None = None) -> go.Figure:
     chart = validate_chart(config)
     if frame.empty:
         raise ValueError("Load actual historical bars before charting")
@@ -94,6 +94,32 @@ def build_chart(frame: pd.DataFrame, config: dict) -> go.Figure:
         xaxis_rangeslider_visible=False, margin=dict(l=35, r=25, t=85, b=30),
         legend=dict(orientation="h", yanchor="bottom", y=1.06),
     )
+    if markers:
+        for side, symbol_shape, name in (
+            ("buy", "triangle-up", "Simulated BUY"),
+            ("sell", "triangle-down", "Simulated SELL"),
+        ):
+            selected = []
+            for item in markers:
+                if str(item.get("side", "")).lower() != side:
+                    continue
+                try:
+                    at = pd.Timestamp(item["timestamp"])
+                    if at.tzinfo is None:
+                        continue
+                    at = at.tz_convert("UTC")
+                    price = float(item["price"])
+                except (KeyError, ValueError, TypeError):
+                    continue
+                if frame.index[0] <= at <= frame.index[-1] and price > 0:
+                    selected.append((at, price))
+            if selected:
+                figure.add_trace(go.Scatter(
+                    x=[p[0] for p in selected], y=[p[1] for p in selected],
+                    mode="markers", name=name,
+                    marker={"symbol": symbol_shape, "size": 13, "line": {"width": 1}},
+                    hovertemplate="%{x}<br>Simulated price: %{y:.4f}<extra></extra>",
+                ), row=1, col=1)
     figure.update_xaxes(rangeslider_visible=False)
     figure.update_yaxes(fixedrange=False)
     return figure

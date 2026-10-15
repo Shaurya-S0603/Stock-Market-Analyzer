@@ -10,23 +10,18 @@ import sys
 from xml.etree import ElementTree
 
 REQUIRED = {
-    "startup_and_navigation": ["test_app_startup", "test_navigation", "test_phase5_management_page"],
-    "market_data_and_watchlists": ["test_workspace_phase1", "test_data_defaults"],
-    "charts_and_indicators": ["test_workspace_indicators", "test_workspace_charts_research"],
-    "company_research_and_screening": ["test_workspace_research_storage", "test_workspace_pages"],
-    "strategies_and_backtest_accounting": [
-        "test_workspace_strategy_schema", "test_workspace_strategy_backtest", "test_workspace_strategy_integration"],
-    "saved_strategy_versions_and_comparison": ["test_workspace_strategy_repository", "test_workspace_strategy_pages"],
-    "strategy_paper_accounts": ["test_workspace_phase4_paper", "test_workspace_phase4_pages"],
-    "alert_and_monitoring_worker": ["test_workspace_phase4_alerts", "test_workspace_phase4_pages"],
-    "sqlite_backup_and_recovery": ["test_phase5_portability"],
-    "ohlcv_import_export": ["test_phase5_csv"],
-    "ai_trader_and_legacy_paper_risk": [
-        "test_ai_trader_quantity", "test_return_seeking_trader", "test_research_intelligence",
-        "test_persistent_simulation", "test_adaptive_exits"],
-    "research_models_and_validation": [
-        "test_calibration", "test_drift", "test_experiment_registry",
-        "test_ensemble_benchmarks", "test_portfolio_backtest"],
+    "app_startup_and_navigation": ["test_app_startup", "test_navigation", "test_personal_workspace"],
+    "market_data_and_watchlists": ["test_workspace_phase1"],
+    "financial_charts_and_indicators": ["test_workspace_indicators", "test_workspace_charts_research", "test_personal_workspace"],
+    "research_and_saved_screeners": ["test_workspace_research_storage", "test_workspace_pages"],
+    "strategy_rule_validation": ["test_workspace_strategy_schema"],
+    "deterministic_backtest_and_trade_markers": ["test_workspace_strategy_backtest", "test_workspace_strategy_integration", "test_personal_workspace"],
+    "versioned_strategy_and_comparison": ["test_workspace_strategy_repository", "test_workspace_strategy_pages"],
+    "manual_paper_lifecycle": ["test_manual_paper"],
+    "automatic_paper_simulation": ["test_workspace_phase4_paper", "test_workspace_phase4_pages"],
+    "local_alerts_and_offline_worker": ["test_workspace_phase4_alerts", "test_workspace_phase4_pages"],
+    "backup_recovery_and_integrity": ["test_phase5_portability", "test_phase5_management_page"],
+    "csv_import_export": ["test_phase5_csv"],
 }
 
 def verify(xml_path: Path, output: Path) -> dict:
@@ -57,7 +52,7 @@ def verify(xml_path: Path, output: Path) -> dict:
     failed = sum(bool(case.findall("failure") or case.findall("error")) for case in cases)
     skipped = sum(bool(case.findall("skipped")) for case in cases)
     result = {
-        "project": "QuantEdge 2.0",
+        "project": "QuantEdge 2.1",
         "evidence_type": "Executed pytest JUnit XML from GitHub Actions",
         "utc_generated": datetime.now(timezone.utc).isoformat(),
         "commit_sha": os.getenv("GITHUB_SHA", "local"),
