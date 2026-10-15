@@ -7,7 +7,7 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 st.set_page_config(
-    page_title="QuantEdge | Stock Research & Paper Trading",
+    page_title="QuantEdge | Personal TradingView & Strategy Lab",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded",

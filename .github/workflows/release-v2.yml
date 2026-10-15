@@ -52,9 +52,9 @@ jobs:
             git tag -a "$TAG" -m "QuantEdge $TAG"
             git push origin "$TAG"
           fi
-          if [[ "$VERSION" == "2.0.0" && -f RELEASE_NOTES_v2.0.0.md ]]; then
+          if [[ -f "RELEASE_NOTES_v${VERSION}.md" ]]; then
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
-              --title "QuantEdge $TAG - Free Streamlit Edition" --notes-file RELEASE_NOTES_v2.0.0.md
+              --title "QuantEdge $TAG - Personal Trading Lab" --notes-file "RELEASE_NOTES_v${VERSION}.md"
           else
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
               --title "QuantEdge $TAG - Free Streamlit Edition" --generate-notes
