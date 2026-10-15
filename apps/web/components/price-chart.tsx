@@ -6,10 +6,11 @@ import {
 } from "lightweight-charts";
 import type { IndicatorPoint, OhlcvBar } from "@/lib/contracts";
 
-export function PriceChart({ bars, sma, showSma }: {
+export function PriceChart({ bars, sma, showSma, ariaLabel = "Fictional daily candlestick chart with crosshair and optional moving average" }: {
   bars: OhlcvBar[];
   sma: IndicatorPoint[];
   showSma: boolean;
+  ariaLabel?: string;
 }) {
   const host = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -48,5 +49,5 @@ export function PriceChart({ bars, sma, showSma }: {
     return () => { resize.disconnect(); chart.remove(); };
   }, [bars, sma, showSma]);
   return <div ref={host} className="min-h-[410px] w-full" role="img"
-    aria-label="Fictional daily candlestick chart with crosshair and optional moving average"/>;
+    aria-label={ariaLabel}/>;
 }

@@ -58,7 +58,7 @@ jobs:
           pip install -r requirements.txt -r apps/api/requirements.txt
 
       - name: Verify FastAPI contracts and bounds
-        run: python -m pytest -q tests/test_v3_api_foundation.py
+        run: python -m pytest -q tests/test_v3_api_foundation.py tests/test_v3_historical_research.py
 
       - name: Install Next.js frontend
         run: npm install --prefix apps/web --no-audit --no-fund

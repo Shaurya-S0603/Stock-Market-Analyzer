@@ -93,3 +93,13 @@ local only, not falsely claimed to be running 24/7.
 Never commit secrets. Vercel server-side FASTAPI_INTERNAL_URL must reference
 the actual publicly reachable FastAPI URL once deployed. Browser clients only
 call same-origin BFF routes. Do not deploy unprotected writable accounts.
+
+## Phase 1A progress (read-only historical adapter)
+- Controlled local opt-in for free, unofficial yfinance historical daily data.
+- Explicit provenance, last-session date semantics and unknown provider delay.
+- Strict three-window history request, no real-time quote claim or paper-account mutation.
+- Small in-process five-minute cache and upstream-concurrency guard.
+- Dedicated /market explorer; Streamlit v2.1.1 remains untouched.
+- Offline mocked provider tests in full-stack CI; production market-data uptime not certified.
+- Follow-up Phase 1B: managed auth, PostgreSQL/Alembic ownership models, Redis
+  cache/rate limiting, and per-user data isolation before public write APIs.

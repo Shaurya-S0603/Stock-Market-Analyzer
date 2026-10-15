@@ -23,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </Link>
               <nav className="mt-8 flex flex-wrap gap-2 lg:flex-col" aria-label="Main navigation">
                 <Link href="/" className="pill bg-slate-800 text-sm">Market & Demo</Link>
+                <Link href="/market" className="pill text-sm">Historical research</Link>
                 <Link href="/roadmap" className="pill text-sm">Development roadmap</Link>
                 <a href="https://github.com/Shaurya-S0603/Quant-Edge-Terminal"
                    className="pill text-sm" target="_blank" rel="noopener noreferrer">Source repository ↗</a>
