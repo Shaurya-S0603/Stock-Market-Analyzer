@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: \${{ matrix.python }}
+          python-version: ${{ matrix.python }}
       - name: Install analytical engine and API dependencies
         run: |
           python -m pip install --upgrade pip
