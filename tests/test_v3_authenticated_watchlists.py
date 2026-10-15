@@ -22,6 +22,8 @@ def configured(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", url)
     monkeypatch.setenv("QUANTEDGE_ALLOW_SQLITE_TEST_DB", "1")
     monkeypatch.setenv("QUANTEDGE_API_JWT_SECRET", SECRET)
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.delenv("QUANTEDGE_REQUIRE_REDIS", raising=False)
     config = Config("apps/api/alembic.ini")
     command.upgrade(config, "head")
     yield
@@ -74,3 +76,35 @@ def test_reject_cross_tenant_invalid_token_claims(configured):
         payload = {"iat": now, "exp": now + 60, **claims}
         token = jwt.encode(payload, SECRET, algorithm="HS256")
         assert client.get("/api/v1/watchlists", headers={"Authorization": "Bearer " + token}).status_code == 401
+
+def test_cache_is_scoped_invalidated_and_rate_capped(monkeypatch):
+    from apps.api import cache
+    monkeypatch.setenv("REDIS_URL", "redis://mocked.local/0")
+    monkeypatch.setenv("QUANTEDGE_REQUIRE_REDIS", "1")
+    store = {}
+    counts = {}
+
+    class FakeRedis:
+        def get(self, key): return store.get(key)
+        def setex(self, key, ttl, value):
+            assert ttl == 15
+            store[key] = value
+        def delete(self, key): store.pop(key, None)
+        def eval(self, script, keys_count, key, seconds):
+            assert keys_count == 1 and seconds == 60
+            counts[key] = counts.get(key, 0) + 1
+            return counts[key]
+
+    monkeypatch.setattr(cache, "_client", lambda url: FakeRedis())
+    cache.remember_lists("github:101", {"watchlists": [{"id": "own"}]})
+    assert cache.cached_lists("github:101")["watchlists"][0]["id"] == "own"
+    assert cache.cached_lists("github:102") is None
+    cache.invalidate_lists("github:101")
+    assert cache.cached_lists("github:101") is None
+    for _ in range(60):
+        assert cache.throttled_subject("github:101") == "github:101"
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException) as error:
+        cache.throttled_subject("github:101")
+    assert error.value.status_code == 429
+    assert cache.throttled_subject("github:102") == "github:102"

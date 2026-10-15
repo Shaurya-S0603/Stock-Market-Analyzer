@@ -45,5 +45,9 @@ The existing Phase 0 synthetic dashboard and Streamlit v2.1.1 remain intact.
   the feature. Do not run destructive database migrations without backup.
 - Current historical data adapter is opt-in and separate from saved watchlists.
   Neither stored symbol lists nor OAuth sign-in guarantee licensed exchange data.
-- Current 1B scope does NOT include Redis caching, provider rate limiting, or
-  persistent strategy/backtest records. Those require an additional reviewed stage.
+- Phase 1B includes a short, owner-scoped Redis read cache (15-second TTL,
+  invalidated on mutations) and atomic Redis write throttle (60 changes/min/user).
+  Set QUANTEDGE_REQUIRE_REDIS=1 for any public deployment so write throttling
+  fails closed rather than silently bypassing missing Redis.
+- Real-market provider-specific quotas, signed provider fetch jobs and persistent
+  strategy/backtest records require an additional reviewed stage.

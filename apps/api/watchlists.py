@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from apps.api.auth import OwnerId
+from apps.api.cache import ThrottledOwner, cached_lists, remember_lists, invalidate_lists
 from apps.api.storage import ResearchUser, SavedWatchlist, SavedSymbol, db_session
 from stockmarket.workspace.database import clean_symbol
 
@@ -54,6 +55,9 @@ def safe_commit(db: Session):
 
 @router.get("")
 def list_watchlists(subject: OwnerId, db: Db):
+    cached = cached_lists(subject)
+    if cached is not None:
+        return cached
     rows = db.scalars(select(SavedWatchlist).where(
         SavedWatchlist.owner_id == subject
     ).order_by(SavedWatchlist.created_at, SavedWatchlist.id)).all()
@@ -65,13 +69,15 @@ def list_watchlists(subject: OwnerId, db: Db):
                            .order_by(SavedSymbol.symbol)).all()
         for list_id, ticker in items:
             symbols[list_id].append(ticker)
-    return {"watchlists": [
+    response = {"watchlists": [
         {"id": row.id, "name": row.name, "symbols": symbols[row.id],
          "created_at": row.created_at.isoformat()} for row in rows
     ]}
+    remember_lists(subject, response)
+    return response
 
 @router.post("", status_code=201)
-def create_watchlist(payload: NamePayload, subject: OwnerId, db: Db):
+def create_watchlist(payload: NamePayload, subject: ThrottledOwner, db: Db):
     name = normalized_name(payload.name)
     count = db.scalar(select(func.count()).select_from(SavedWatchlist).where(
         SavedWatchlist.owner_id == subject
@@ -84,17 +90,19 @@ def create_watchlist(payload: NamePayload, subject: OwnerId, db: Db):
     list_item = SavedWatchlist(owner_id=subject, name=name)
     db.add(list_item)
     safe_commit(db)
+    invalidate_lists(subject)
     return {"id": list_item.id, "name": name, "symbols": []}
 
 @router.delete("/{list_id}", status_code=200)
-def delete_watchlist(list_id: UUID, subject: OwnerId, db: Db):
+def delete_watchlist(list_id: UUID, subject: ThrottledOwner, db: Db):
     row = owned(db, subject, list_id)
     db.delete(row)
     safe_commit(db)
+    invalidate_lists(subject)
     return {"deleted": True}
 
 @router.post("/{list_id}/symbols", status_code=201)
-def add_symbol(list_id: UUID, payload: SymbolPayload, subject: OwnerId, db: Db):
+def add_symbol(list_id: UUID, payload: SymbolPayload, subject: ThrottledOwner, db: Db):
     owned(db, subject, list_id)
     ticker = normalized_symbol(payload.symbol)
     existing = db.scalar(select(SavedSymbol.id).where(
@@ -107,10 +115,11 @@ def add_symbol(list_id: UUID, payload: SymbolPayload, subject: OwnerId, db: Db):
         raise HTTPException(status_code=409, detail="Maximum of 50 symbols per watchlist")
     db.add(SavedSymbol(watchlist_id=str(list_id), symbol=ticker))
     safe_commit(db)
+    invalidate_lists(subject)
     return {"symbol": ticker, "added": True}
 
 @router.delete("/{list_id}/symbols/{symbol}")
-def remove_symbol(list_id: UUID, symbol: str, subject: OwnerId, db: Db):
+def remove_symbol(list_id: UUID, symbol: str, subject: ThrottledOwner, db: Db):
     owned(db, subject, list_id)
     ticker = normalized_symbol(symbol)
     result = db.execute(delete(SavedSymbol).where(
@@ -119,4 +128,5 @@ def remove_symbol(list_id: UUID, symbol: str, subject: OwnerId, db: Db):
     if result.rowcount == 0:
         raise HTTPException(status_code=404, detail="Ticker not on watchlist")
     safe_commit(db)
+    invalidate_lists(subject)
     return {"deleted": True}
