@@ -1,0 +1,11 @@
+.git
+.data
+.env
+.env.*
+**/.next
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/*.db
+**/*.sqlite
+**/*.sqlite3

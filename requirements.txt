@@ -9,3 +9,6 @@ pydantic>=2.7,<3
 
 # Automated regression testing
 pytest>=8,<9
+
+# The v3 FastAPI alpha runs alongside the existing v2 Streamlit release.
+-r apps/api/requirements.txt

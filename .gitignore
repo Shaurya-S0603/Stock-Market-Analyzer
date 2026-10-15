@@ -12,3 +12,9 @@ paper_trading.db
 *.sqlite3
 .DS_Store
 Thumbs.db
+
+# Next.js and node build artifacts
+**/node_modules/
+**/.next/
+**/*.tsbuildinfo
+npm-debug.log*
