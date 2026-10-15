@@ -6,7 +6,6 @@ authentication, per-user storage and database isolation have been tested.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from functools import lru_cache
 import os
 import math
@@ -14,7 +13,7 @@ from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from stockmarket.workspace.demo_data import synthetic_demo_bars
 from stockmarket.workspace.indicators import ema, rsi, sma
@@ -38,8 +37,14 @@ def _demo():
     return synthetic_demo_bars()
 
 
+def _demo_strategy():
+    # Keep the strategy symbol consistent with its entirely fictional price series.
+    return example_strategy().model_copy(update={"symbol": DEMO_SYMBOL})
+
+
 class DemoRequest(BaseModel):
     """Bound inputs so demo endpoints cannot trigger expensive arbitrary work."""
+    model_config = ConfigDict(extra="forbid")
     starting_cash: float = Field(default=10000, ge=100, le=1_000_000, allow_inf_nan=False)
 
 
@@ -160,13 +165,13 @@ def indicators(symbol: str, period: int = Query(default=20, ge=2, le=250)) -> di
 
 @app.get("/api/v1/strategies/example")
 def strategy_example() -> dict:
-    data = example_strategy().model_dump(mode="json")
+    data = _demo_strategy().model_dump(mode="json")
     return {"strategy": data, "label": "Illustrative rule set only; no trades are submitted."}
 
 
 @app.post("/api/v1/backtests/demo")
 def backtest_demo(payload: DemoRequest) -> dict:
-    result = run_backtest(_demo(), example_strategy(), starting_cash=payload.starting_cash)
+    result = run_backtest(_demo(), _demo_strategy(), starting_cash=payload.starting_cash)
     return {
         "symbol": DEMO_SYMBOL,
         "fictional": True, "provider": SOURCE,
