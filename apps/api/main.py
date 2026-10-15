@@ -19,6 +19,7 @@ from stockmarket.workspace.demo_data import synthetic_demo_bars
 from stockmarket.workspace.indicators import ema, rsi, sma
 from stockmarket.workspace.strategy_backtest import run_backtest
 from stockmarket.workspace.strategy_schema import example_strategy
+from apps.api.historical import historical_ohlcv
 
 app = FastAPI(
     title="QuantEdge Research API",
@@ -118,12 +119,10 @@ def symbols() -> dict:
 
 
 @app.get("/api/v1/market/{symbol}/ohlcv")
-def history(symbol: str, interval: Literal["1d"] = "1d") -> dict:
+def history(symbol: str, interval: Literal["1d"] = "1d",
+            period: Literal["3mo", "6mo", "1y"] = "6mo") -> dict:
     if symbol.upper() != DEMO_SYMBOL:
-        raise HTTPException(
-            status_code=404,
-            detail="Historical provider ingestion is not yet connected. Only fictional QEDMO is supported.",
-        )
+        return historical_ohlcv(symbol, period)
     frame = _demo()
     bars = [
         {
