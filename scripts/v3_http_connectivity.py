@@ -2,6 +2,10 @@
 from __future__ import annotations
 
 import json
+import os
+import time
+
+import jwt
 import urllib.error
 import urllib.request
 
@@ -40,6 +44,37 @@ def check() -> None:
             assert reply.status == 200
         assert backtest["fictional"] is True
         assert len(backtest["equity"]) == 320
+
+    # Signed identity is asserted exclusively by the Next BFF in production.
+    # This local CI probe additionally verifies the backend trust boundary.
+    secret = os.getenv("QUANTEDGE_API_JWT_SECRET")
+    if secret:
+        def token(subject: str):
+            return jwt.encode({"sub": subject, "iss": "quantedge-next",
+                               "aud": "quantedge-api", "iat": int(time.time()),
+                               "exp": int(time.time()) + 90}, secret, algorithm="HS256")
+        def request_json(path: str, method: str, body: dict | None, who: str):
+            data = json.dumps(body).encode("utf-8") if body is not None else None
+            request = urllib.request.Request(BACKEND + path, method=method, data=data,
+                headers={"Authorization": "Bearer " + token(who),
+                         "Content-Type": "application/json"})
+            with urllib.request.urlopen(request, timeout=8) as reply:
+                return json.load(reply)
+        name = "ci-watchlist-" + str(os.getpid())
+        created = request_json("/api/v1/watchlists", "POST", {"name": name}, "github:100001")
+        wid = created["id"]
+        request_json(f"/api/v1/watchlists/{wid}/symbols", "POST", {"symbol": "MSFT"}, "github:100001")
+        mine = request_json("/api/v1/watchlists", "GET", None, "github:100001")
+        theirs = request_json("/api/v1/watchlists", "GET", None, "github:100002")
+        assert any(w["id"] == wid and "MSFT" in w["symbols"] for w in mine["watchlists"])
+        assert all(w["id"] != wid for w in theirs["watchlists"])
+        request_json(f"/api/v1/watchlists/{wid}", "DELETE", None, "github:100001")
+        try:
+            get_json(FRONTEND, "/api/v1/watchlists")
+        except urllib.error.HTTPError as err:
+            assert err.code == 401
+        else:
+            raise AssertionError("Unauthenticated watchlists BFF was reachable")
 
     try:
         get_json(FRONTEND, "/api/v1/market/MSFT/ohlcv")
