@@ -1,4 +1,4 @@
-# QuantEdge 2.1 | Free Personal TradingView-Style Strategy Lab
+# QuantEdge 2.1.1 | Free Personal Streamlit Strategy Website
 
 QuantEdge is a **single-user, local-first Streamlit** market research, interactive charting, strategy backtesting, and paper-only trading workstation. No paid API, cloud database, broker login, Next.js backend, or subscription required.
 
@@ -51,3 +51,10 @@ QuantEdge 2.1 removes the old ML forecasting/AI Trader UI, duplicate dashboards/
 - Streamlit Community Cloud has ephemeral local storage; use local operation and private backups for durable research history.
 
 Docs: docs/PRODUCT_SPEC.md, docs/PHASE_3_STRATEGIES_BACKTESTS.md, docs/PHASE_5_OPERATIONS.md.
+
+
+## Publish the interactive website and learn to use it
+
+The **Start Here** page includes a first-time tutorial and a one-click, explicitly fictional QEDMO practice dataset. For free Streamlit Community Cloud hosting, choose **Shaurya-S0603/Quant-Edge-Terminal**, branch **main**, entrypoint **app.py**, Python **3.12**, and add the root-level Streamlit secret `QUANTEDGE_PUBLIC_DEMO = "1"`. This keeps each visitor's temporary paper workspace isolated. Cloud data is not durable, so download your backups or run privately on your own computer.
+
+Follow the full [Website deployment and usage tutorial](docs/STREAMLIT_WEBSITE_TUTORIAL.md). The application cannot be treated as a live brokerage or guaranteed real-time market feed.
