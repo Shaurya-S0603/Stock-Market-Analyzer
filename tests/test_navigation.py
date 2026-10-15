@@ -1,35 +1,17 @@
-from __future__ import annotations
+"""No duplicate ML dashboards or compulsory AI portfolio onboarding."""
+from pathlib import Path
+from stockmarket.ui.app import navigation_pages
 
-from streamlit.testing.v1 import AppTest
 
-
-def test_navigation_accepts_callable_pages_with_explicit_routes() -> None:
-    app = AppTest.from_string(
-        '''
-import streamlit as st
-
-pages = {
-    "Workspace": [
-        st.Page(lambda: st.write("dashboard"), title="Dashboard", default=True),
-        st.Page(lambda: st.write("markets"), title="Markets", url_path="markets"),
-        st.Page(lambda: st.write("trader"), title="AI Trader", url_path="ai-trader"),
-        st.Page(lambda: st.write("portfolio"), title="Portfolio", url_path="portfolio"),
-        st.Page(lambda: st.write("journal"), title="Trade Journal", url_path="trade-journal"),
-    ],
-    "Research": [
-        st.Page(lambda: st.write("models"), title="Model Analytics", url_path="model-analytics"),
-        st.Page(lambda: st.write("research"), title="Research Lab", url_path="research-lab"),
-        st.Page(lambda: st.write("backtest"), title="Backtesting", url_path="backtesting"),
-        st.Page(lambda: st.write("risk"), title="Risk Analytics", url_path="risk-analytics"),
-    ],
-    "System": [
-        st.Page(lambda: st.write("settings"), title="Settings", url_path="settings"),
-    ],
-}
-
-navigation = st.navigation(pages, position="sidebar", expanded=True)
-navigation.run()
-'''
-    ).run()
-
-    assert not app.exception
+def test_nav_has_focused_tradingview_workflow(monkeypatch):
+    nav=navigation_pages()
+    assert list(nav)==["Workspace","Strategy Lab","Paper Practice","System"]
+    page_count=sum(len(pages) for pages in nav.values())
+    assert page_count==13
+    src=Path("src/stockmarket/ui/app.py").read_text()
+    for name in ["personal_dashboard_page","chart_terminal_page",
+                 "strategy_builder_page","strategy_backtesting_page",
+                 "manual_paper_page","strategy_paper_page","alert_center_page"]:
+        assert name in src
+    assert "ai_trader_page" not in src
+    assert "render_onboarding" not in src
