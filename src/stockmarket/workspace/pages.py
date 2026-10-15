@@ -78,6 +78,27 @@ def chart_terminal_page() -> None:
               "indicators": enabled, "length": length, "rsi_length": rsi_length,
               "bollinger_std": deviation, "volume": volume}
 
+    from .strategy_repository import StrategyRepository
+    from .manual_paper import ManualPaperRepository
+    backtests = StrategyRepository(db)
+    manuals = ManualPaperRepository(db)
+    overlays = {"No simulated trade markers": None}
+    for record in backtests.list_backtests():
+        stored = backtests.load_backtest(record["id"])
+        meta = stored["result"]["metadata"]
+        if meta["symbol"] == symbol and meta["timeframe"] == interval:
+            overlays[f"Backtest: {record['name']} (#{record['id']})"] = [
+                {"timestamp": row["timestamp"], "side": row["side"], "price": row["price"]}
+                for row in stored["result"].get("orders", []) if row.get("status") == "filled"
+            ]
+    if interval == "1d":
+        for account in manuals.list_accounts():
+            if account["symbol"] == symbol:
+                overlays[f"Manual paper: {account['name']} (#{account['id']})"] = [
+                    {"timestamp": row["observed_bar"], "side": row["side"], "price": row["price"]}
+                    for row in manuals.list_orders(account["id"])
+                ]
+    overlay_name = st.selectbox("Show simulated entry/exit markers", list(overlays))
     refresh = st.button("Refresh selected symbol from free provider")
     try:
         result = service.history(symbol, interval=interval, period=period,
@@ -89,7 +110,7 @@ def chart_terminal_page() -> None:
             f"{result.frame.index[0]} through {result.frame.index[-1]} · "
             "UTC labels · unadjusted historical prices"
         )
-        fig = build_chart(result.frame, config)
+        fig = build_chart(result.frame, config, markers=overlays[overlay_name])
         st.plotly_chart(fig, use_container_width=True, key="qe_financial_chart")
         with st.expander("Recent computed indicator values"):
             from .indicators import indicator_snapshot
