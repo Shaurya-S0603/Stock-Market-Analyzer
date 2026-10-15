@@ -1,6 +1,8 @@
 """Standalone Streamlit market-explorer surface using persistent workspace services."""
 from __future__ import annotations
 
+from .runtime import workspace_path
+
 import os
 
 import plotly.graph_objects as go
@@ -39,7 +41,7 @@ def market_explorer_page() -> None:
     st.title("Market Explorer & Watchlists")
     st.caption("Free-data research terminal. No brokerage access; price charts are historical or cached, never promised real-time.")
     try:
-        db = workspace_db(os.getenv("QUANTEDGE_WORKSPACE_DB", ".data/workspace.db"))
+        db = workspace_db(workspace_path())
         service = MarketDataService(db)
         db.default_watchlist()
     except Exception as exc:

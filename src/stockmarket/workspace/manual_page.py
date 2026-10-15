@@ -1,5 +1,7 @@
 """Streamlit manual paper orders at completed cached closes, never real quotes."""
 from __future__ import annotations
+
+from .runtime import workspace_path
 import os
 import pandas as pd
 import streamlit as st
@@ -12,7 +14,7 @@ def manual_paper_page() -> None:
     st.title("Manual Paper Trading")
     st.caption("Practice simulated BUY/SELL decisions without depositing money or connecting a broker. "
                "Execution uses the last completed saved DAILY close, not a real-time market order.")
-    db = workspace_db(os.getenv("QUANTEDGE_WORKSPACE_DB", ".data/workspace.db"))
+    db = workspace_db(workspace_path())
     repo = ManualPaperRepository(db)
     symbols = [s for s in db.cached_symbols() if len(db.load_candles(s,"1d")) >= 3]
     if symbols:
