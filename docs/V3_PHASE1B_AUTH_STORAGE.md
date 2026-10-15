@@ -35,6 +35,7 @@ The existing Phase 0 synthetic dashboard and Streamlit v2.1.1 remain intact.
    shell environment. Missing variables leave saved research inaccessible.
 
 ## Safety and deployment notes
+- The BFF returns HTTP 503 when GitHub OAuth/secrets are unconfigured, and HTTP 401 when configured but the user has no valid session. Neither permits anonymous data access.
 - The BFF does not accept user-supplied authorization headers. No unsigned
   user-identifying headers are trusted by FastAPI.
 - Authenticated research is unavailable rather than falling back to anonymous

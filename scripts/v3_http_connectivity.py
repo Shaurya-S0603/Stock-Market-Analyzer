@@ -72,7 +72,7 @@ def check() -> None:
         try:
             get_json(FRONTEND, "/api/v1/watchlists")
         except urllib.error.HTTPError as err:
-            assert err.code == 401
+            assert err.code in (401, 503), ("Watchlists exposed or unexpected response", err.code)
         else:
             raise AssertionError("Unauthenticated watchlists BFF was reachable")
 
