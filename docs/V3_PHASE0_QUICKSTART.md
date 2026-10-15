@@ -18,6 +18,17 @@ for a public deployment.
 Use Python 3.12 and Node.js 22 (Next.js 16 needs Node >=20.9):
 
     python -m pip install -r requirements.txt -r apps/api/requirements.txt
+
+The source package lives in the repo's `src/` directory. Run the backend
+from the repository root with that directory on the Python import path.
+
+macOS/Linux:
+
+    PYTHONPATH=src python -m uvicorn apps.api.main:app --reload --port 8000
+
+Windows PowerShell:
+
+    $env:PYTHONPATH="src"
     python -m uvicorn apps.api.main:app --reload --port 8000
 
 In another shell:
