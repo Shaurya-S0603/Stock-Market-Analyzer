@@ -20,6 +20,7 @@ from stockmarket.workspace.indicators import ema, rsi, sma
 from stockmarket.workspace.strategy_backtest import run_backtest
 from stockmarket.workspace.strategy_schema import example_strategy
 from apps.api.historical import historical_ohlcv
+from apps.api.watchlists import router as watchlists_router
 
 app = FastAPI(
     title="QuantEdge Research API",
@@ -182,3 +183,7 @@ def backtest_demo(payload: DemoRequest) -> dict:
         "execution": result["metadata"]["execution"],
         "warning": "Fictional historical simulation only. No real orders or profit forecast.",
     }
+
+
+# Authenticated API only. Legacy demo endpoints remain intentionally unchanged.
+app.include_router(watchlists_router)
